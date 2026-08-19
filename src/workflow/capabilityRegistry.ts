@@ -308,3 +308,27 @@ export function extractRequiredCapabilities(workflow: Partial<Workflow>): Capabi
 
   return Array.from(capMap.values());
 }
+
+/**
+ * Checks if a given capability type is whitelisted in the capability registry.
+ */
+export function isCapabilitySupported(
+  category: 'TRIGGERS' | 'CONDITIONS' | 'ACTIONS' | 'RECOVERY' | 'VERIFICATION',
+  capabilityType: string
+): boolean {
+  switch (category) {
+    case 'TRIGGERS':
+      return capabilityType in SUPPORTED_TRIGGERS;
+    case 'CONDITIONS':
+      return capabilityType in SUPPORTED_CONDITIONS;
+    case 'ACTIONS':
+      return capabilityType in SUPPORTED_ACTIONS;
+    case 'RECOVERY':
+      return capabilityType in SUPPORTED_RECOVERY_STRATEGIES;
+    case 'VERIFICATION':
+      return capabilityType in SUPPORTED_VERIFICATION_TYPES;
+    default:
+      return false;
+  }
+}
+

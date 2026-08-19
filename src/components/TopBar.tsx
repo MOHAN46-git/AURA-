@@ -4,11 +4,11 @@
  */
 
 import React from 'react';
-import { Sparkles, Activity, Layers, Plus, Terminal } from 'lucide-react';
+import { Sparkles, Activity, Layers, Plus, Terminal, FlaskConical } from 'lucide-react';
 
 interface TopBarProps {
-  activeTab: 'studio' | 'automations' | 'logs' | 'capabilities';
-  setActiveTab: (tab: 'studio' | 'automations' | 'logs' | 'capabilities') => void;
+  activeTab: 'studio' | 'automations' | 'logs' | 'capabilities' | 'tests';
+  setActiveTab: (tab: 'studio' | 'automations' | 'logs' | 'capabilities' | 'tests') => void;
   onNewGoalClick: () => void;
   activeAutomationsCount: number;
   logsCount?: number;
@@ -98,6 +98,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <Layers className="h-4 w-4" />
             <span className="hidden sm:inline">Capabilities</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tests')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'tests'
+                ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <FlaskConical className="h-4 w-4 text-emerald-400" />
+            <span>Tests</span>
           </button>
         </nav>
 

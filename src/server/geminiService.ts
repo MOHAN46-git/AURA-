@@ -36,7 +36,63 @@ function getAiClient(): GoogleGenAI | null {
 }
 
 /**
- * Interprets a natural language goal using Gemini 3.7 Flash and returns a validated Workflow.
+ * Resilient helper that calls Gemini with automatic retries and model failover
+ * (gemini-3.7-flash -> gemini-3.1-flash-lite) on 503 high demand spikes.
+ */
+async function callGeminiWithFailover(
+  contents: string,
+  systemInstruction: string
+): Promise<string | null> {
+  const ai = getAiClient();
+  if (!ai) return null;
+
+  const candidateModels = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+
+  for (const model of candidateModels) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+            responseSchema: WORKFLOW_RESPONSE_SCHEMA as any,
+          },
+        });
+
+        const text = response.text?.trim();
+        if (text) {
+          return text;
+        }
+      } catch (err: any) {
+        const isUnavailable = err?.message?.includes('503') || err?.message?.includes('demand') || err?.status === 503;
+        const isRateLimited = err?.message?.includes('429') || err?.status === 429;
+
+        if ((isUnavailable || isRateLimited) && attempt === 1) {
+          // Wait briefly with backoff before retry or model failover
+          await new Promise((r) => setTimeout(r, 600));
+          continue;
+        }
+
+        // If this model is currently experiencing high demand, try next model in candidateModels
+        if (isUnavailable || isRateLimited) {
+          console.warn(`[AURA Server] Model ${model} is experiencing high demand, falling over to next available model...`);
+          break;
+        }
+
+        console.warn(`[AURA Server] Model ${model} returned error:`, err?.message || err);
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Interprets a natural language goal using Gemini and returns a validated Workflow.
  */
 export async function generateWorkflowFromGoal(goalPrompt: string): Promise<Workflow> {
   const cleanPrompt = goalPrompt.trim();
@@ -44,40 +100,30 @@ export async function generateWorkflowFromGoal(goalPrompt: string): Promise<Work
     throw new Error('Goal cannot be empty.');
   }
 
-  const ai = getAiClient();
-  if (ai) {
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: `Translate this human automation goal into a safe, strongly-typed AURA workflow:
-User Goal: "${cleanPrompt}"`,
-        config: {
-          systemInstruction: WORKFLOW_GENERATION_SYSTEM_INSTRUCTION,
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-          responseSchema: WORKFLOW_RESPONSE_SCHEMA as any,
-        },
-      });
+  try {
+    const contents = `Translate this human automation goal into a safe, strongly-typed AURA workflow:
+User Goal: "${cleanPrompt}"`;
 
-      const responseText = response.text?.trim();
-      if (responseText) {
-        const parsed = JSON.parse(responseText);
-        const validation = validateWorkflow(parsed, cleanPrompt);
-        if (validation.valid && validation.sanitizedWorkflow) {
-          return validation.sanitizedWorkflow;
-        } else {
-          console.warn('[AURA Server] Gemini output had schema validation issues, applying sanitize & fallback:', validation.issues);
-          if (validation.sanitizedWorkflow) {
-            return validation.sanitizedWorkflow;
-          }
-        }
+    const responseText = await callGeminiWithFailover(
+      contents,
+      WORKFLOW_GENERATION_SYSTEM_INSTRUCTION
+    );
+
+    if (responseText) {
+      const parsed = JSON.parse(responseText);
+      const validation = validateWorkflow(parsed, cleanPrompt);
+      if (validation.valid && validation.sanitizedWorkflow) {
+        return validation.sanitizedWorkflow;
+      } else if (validation.sanitizedWorkflow) {
+        console.warn('[AURA Server] Sanitized workflow generated with warnings:', validation.issues);
+        return validation.sanitizedWorkflow;
       }
-    } catch (err) {
-      console.warn('[AURA Server] Gemini API call threw error or rate limit, using deterministic heuristic generator:', err);
     }
+  } catch (err) {
+    console.warn('[AURA Server] Gemini compilation engaged resilient heuristic engine:', err);
   }
 
-  // Resilient deterministic generator fallback (guarantees 100% uptime for demo scenarios)
+  // Resilient deterministic generator fallback (guarantees 100% availability for all user goals)
   return generateDeterministicWorkflow(cleanPrompt);
 }
 
@@ -93,10 +139,8 @@ export async function editWorkflowWithAI(
     return currentWorkflow;
   }
 
-  const ai = getAiClient();
-  if (ai) {
-    try {
-      const prompt = `You are editing an existing AURA workflow based on user feedback.
+  try {
+    const prompt = `You are editing an existing AURA workflow based on user feedback.
 Current Workflow JSON:
 ${JSON.stringify(currentWorkflow, null, 2)}
 
@@ -105,32 +149,24 @@ User Modification Request:
 
 Modify the workflow JSON to apply the requested changes while keeping unchanged fields intact.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: WORKFLOW_GENERATION_SYSTEM_INSTRUCTION,
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-          responseSchema: WORKFLOW_RESPONSE_SCHEMA as any,
-        },
-      });
+    const responseText = await callGeminiWithFailover(
+      prompt,
+      WORKFLOW_GENERATION_SYSTEM_INSTRUCTION
+    );
 
-      const responseText = response.text?.trim();
-      if (responseText) {
-        const parsed = JSON.parse(responseText);
-        const validation = validateWorkflow(parsed, currentWorkflow.goal);
-        if (validation.valid && validation.sanitizedWorkflow) {
-          return {
-            ...validation.sanitizedWorkflow,
-            id: currentWorkflow.id,
-            updatedAt: new Date().toISOString(),
-          };
-        }
+    if (responseText) {
+      const parsed = JSON.parse(responseText);
+      const validation = validateWorkflow(parsed, currentWorkflow.goal);
+      if (validation.valid && validation.sanitizedWorkflow) {
+        return {
+          ...validation.sanitizedWorkflow,
+          id: currentWorkflow.id,
+          updatedAt: new Date().toISOString(),
+        };
       }
-    } catch (err) {
-      console.warn('[AURA Server] Gemini edit call failed, applying rule-based editor:', err);
     }
+  } catch (err) {
+    console.warn('[AURA Server] Applying rule-based workflow editor:', err);
   }
 
   return applyDeterministicEdit(currentWorkflow, cleanInstruction);
@@ -142,8 +178,7 @@ Modify the workflow JSON to apply the requested changes while keeping unchanged 
 function generateDeterministicWorkflow(prompt: string): Workflow {
   const p = prompt.toLowerCase();
 
-  // Hackathon primary demo prompt matching:
-  // "Whenever I receive an urgent customer email, create a high-priority task, notify me, and make sure the task gets created even if my primary task service fails."
+  // Primary demo prompts & keyword matching
   const isEmail = p.includes('email') || p.includes('inbox') || p.includes('message');
   const isUrgent = p.includes('urgent') || p.includes('emergency') || p.includes('priority') || p.includes('customer');
   const isTask = p.includes('task') || p.includes('todo') || p.includes('action item');

@@ -15,6 +15,7 @@ import { EditWorkflowModal } from './components/EditWorkflowModal.tsx';
 import { DashboardView } from './components/DashboardView.tsx';
 import { ExecutionLogsView, ExecutionLogEntry } from './components/ExecutionLogsView.tsx';
 import { CapabilitiesRegistryModal } from './components/CapabilitiesRegistryModal.tsx';
+import { DemoTestConsole } from './components/DemoTestConsole.tsx';
 import {
   Sparkles,
   CheckCircle2,
@@ -67,7 +68,7 @@ const INITIAL_LOGS: ExecutionLogEntry[] = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'studio' | 'automations' | 'logs' | 'capabilities'>('studio');
+  const [activeTab, setActiveTab] = useState<'studio' | 'automations' | 'logs' | 'capabilities' | 'tests'>('studio');
   const [workflows, setWorkflows] = useState<Workflow[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -433,6 +434,9 @@ export default function App() {
 
         {/* Tab 4: Capability Registry */}
         {activeTab === 'capabilities' && <CapabilitiesRegistryModal />}
+
+        {/* Tab 5: Automated Test Console */}
+        {activeTab === 'tests' && <DemoTestConsole />}
       </main>
 
       {/* Simulation Modal Runner */}
@@ -440,9 +444,32 @@ export default function App() {
         <SimulationTimeline
           workflow={currentWorkflow}
           onClose={() => setIsSimulationOpen(false)}
-          onSimulationComplete={(result: SimulationResult) => {
+          onSimulationComplete={(result: SimulationResult, auditEvents) => {
             if (result.status === 'SUCCESS' || result.status === 'RECOVERED') {
-              showToast(`Simulation passed with status: ${result.status}`);
+              showToast(`Simulation completed: ${result.status} (${result.totalDurationMs}ms)`);
+              
+              const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              const isRecovered = result.status === 'RECOVERED';
+              
+              const newLogEntry: ExecutionLogEntry = {
+                id: `sim-exec-${Date.now().toString().slice(-6)}`,
+                workflowId: currentWorkflow.id,
+                workflowName: currentWorkflow.name,
+                triggerType: currentWorkflow.trigger.type,
+                status: isRecovered ? 'RECOVERED' : 'SUCCESS',
+                durationMs: result.totalDurationMs,
+                timestamp: `Simulation at ${timestamp}`,
+                details: isRecovered
+                  ? 'Milestone 2 Loop: Primary Failure → Diagnose → Retry #1 → Retry #2 → Fallback → Success → Verify → Goal Achieved.'
+                  : 'Direct execution pass completed without exceptions.',
+                recoveryNote: isRecovered ? 'Self-Healing Fallback Routing' : undefined,
+                logs: auditEvents && auditEvents.length > 0
+                  ? auditEvents.map((e) => `[${e.timestamp}] [${e.type}] ${e.title}: ${e.message}`)
+                  : result.steps.flatMap((s) => s.logs),
+              };
+
+              setLogs((prev) => [newLogEntry, ...prev]);
+              setExecutionCount((c) => c + 1);
             }
           }}
         />
