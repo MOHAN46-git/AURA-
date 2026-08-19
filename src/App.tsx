@@ -160,21 +160,28 @@ export default function App() {
     fetchStatus();
   }, []);
 
-  // Save to localStorage whenever workflows change
+  // Save to localStorage and Firestore whenever workflows change
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(workflows));
     } catch (e) {
       console.error('Failed to persist workflows:', e);
     }
+    // Auto-sync active workflows to Firestore
+    workflows.forEach((wf) => {
+      syncWorkflowToFirestore(wf);
+    });
   }, [workflows]);
 
-  // Save logs to localStorage
+  // Save logs to localStorage and Firestore
   useEffect(() => {
     try {
       localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(logs));
     } catch (e) {
       console.error('Failed to persist logs:', e);
+    }
+    if (logs.length > 0) {
+      syncExecutionLogToFirestore(logs[0]);
     }
   }, [logs]);
 
