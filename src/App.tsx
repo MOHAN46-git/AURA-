@@ -387,22 +387,48 @@ export default function App() {
       }
     }
 
-    // If workflow schedules calendar event, call Google Calendar API
+    // If workflow schedules calendar event, call Google Calendar API with smart slot finder
     if (workflow.actions.some((a) => a.type === 'CREATE_CALENDAR_EVENT')) {
       try {
-        const tomorrow = new Date(Date.now() + 86400000);
+        const slotRes = await fetch('/api/calendar/find-slot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetDateOffsetDays: 1, durationMinutes: 30, preferredWindow: 'afternoon' }),
+        }).then((r) => r.json());
+
+        const start = slotRes?.proposedSlot?.start || new Date(Date.now() + 86400000).toISOString();
+        const end = slotRes?.proposedSlot?.end || new Date(Date.now() + 86400000 + 1800000).toISOString();
+
         await fetch('/api/calendar/create-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             summary: workflow.name || 'Project Review',
-            description: workflow.goal,
-            start: new Date(tomorrow.setHours(15, 30, 0, 0)).toISOString(),
-            end: new Date(tomorrow.setHours(16, 0, 0, 0)).toISOString(),
+            description: `${workflow.goal}\n\nAutomated and verified by AURA Workflow OS`,
+            start,
+            end,
           }),
         });
       } catch (e) {
         console.warn('Real calendar creation notice:', e);
+      }
+    }
+
+    // If workflow has notification or email action, dispatch real email to user's Gmail
+    if (workflow.actions.some((a) => a.type === 'SEND_NOTIFICATION' || a.type === 'SEND_EMAIL')) {
+      try {
+        const recipient = googleStatus.email || 'mohanmohan200405@gmail.com';
+        await fetch('/api/gmail/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: recipient,
+            subject: `⚡ AURA Alert: ${workflow.name} Executed`,
+            body: `<p><strong>Goal:</strong> ${workflow.goal}</p><p><strong>Execution Status:</strong> <span style="color: ${isRecovered ? '#4f46e5' : '#16a34a'}; font-weight: bold;">${isRecovered ? 'RECOVERED (Failover Route Engaged)' : 'SUCCESS'}</span></p><p><strong>Latency:</strong> ${duration}ms</p><p><strong>Outcome Verification:</strong> Confirmed in AURA Verified Store.</p>`,
+          }),
+        });
+      } catch (e) {
+        console.warn('Real Gmail dispatch notice:', e);
       }
     }
 

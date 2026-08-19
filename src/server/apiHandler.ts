@@ -20,6 +20,7 @@ import {
   listRecentGmailMessages,
   injectDemoEmail,
   classifyEmailSemantic,
+  sendRealGmailMessage,
 } from './googleGmailService.ts';
 import {
   getAllTasks,
@@ -201,6 +202,27 @@ export async function handleApiRequest(req: any, res: any, urlPath: string) {
       const classification = classifyEmailSemantic(subject, snippet);
       res.statusCode = 200;
       res.end(JSON.stringify({ success: true, ...classification }));
+      return;
+    }
+
+    if (urlPath === '/api/gmail/send' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { to, subject, body: emailBody } = body || {};
+
+      if (!emailBody) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'email body is required.' }));
+        return;
+      }
+
+      const sendResult = await sendRealGmailMessage({
+        to: to || 'mohanmohan200405@gmail.com',
+        subject: subject || 'AURA Autonomous Alert',
+        body: emailBody,
+      });
+
+      res.statusCode = sendResult.success ? 200 : 500;
+      res.end(JSON.stringify(sendResult));
       return;
     }
 

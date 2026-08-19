@@ -13,7 +13,7 @@ import {
   createGoogleCalendarEvent,
   verifyGoogleCalendarEvent,
 } from '../../src/server/googleCalendarService.ts';
-import { classifyEmailSemantic } from '../../src/server/googleGmailService.ts';
+import { classifyEmailSemantic, sendRealGmailMessage } from '../../src/server/googleGmailService.ts';
 import {
   primaryTaskProvider,
   backupTaskProvider,
@@ -28,15 +28,25 @@ export async function testGoogleAndTaskIntegration(): Promise<void> {
   assertTrue(authStatus.connected, 'Google service must be connected for demo');
   assertTrue(authStatus.scopes.some((s) => s.includes('calendar')), 'Must contain calendar scope');
   assertTrue(authStatus.scopes.some((s) => s.includes('gmail')), 'Must contain gmail scope');
+  assertTrue(authStatus.scopes.some((s) => s.includes('gmail.send')), 'Must contain gmail.send scope');
 
-  // 2. Google Calendar Conflict Slot Finder
+  // 2. Outbound Real Gmail Message Dispatch
+  const sendEmailRes = await sendRealGmailMessage({
+    to: 'mohanmohan200405@gmail.com',
+    subject: 'Automated Test Alert',
+    body: 'This is a test notification from AURA execution engine.',
+  });
+  assertTrue(sendEmailRes.success, 'sendRealGmailMessage must return success true');
+  assertTrue(Boolean(sendEmailRes.messageId), 'sendRealGmailMessage must return messageId');
+
+  // 3. Google Calendar Conflict Slot Finder
   // Should resolve afternoon slot and avoid 14:00 - 15:00 conflict
   const slotRes = await findAvailableSlot(1, 30, 'afternoon');
   assertTrue(Boolean(slotRes.proposedSlot), 'Must propose an available slot');
   assertTrue(slotRes.proposedSlot!.durationMinutes === 30, 'Must match 30m duration');
   assertTrue(slotRes.hasConflict, 'Must detect existing 2-3 PM conflict on test schedule');
 
-  // 3. Calendar Event Creation & Independent Verification
+  // 4. Calendar Event Creation & Independent Verification
   const tomorrow = new Date(Date.now() + 86400000);
   const startStr = new Date(tomorrow.setHours(15, 30, 0, 0)).toISOString();
   const endStr = new Date(tomorrow.setHours(16, 0, 0, 0)).toISOString();
@@ -53,7 +63,7 @@ export async function testGoogleAndTaskIntegration(): Promise<void> {
   assertTrue(verifyCalRes.verified, 'Independent outcome verification must confirm event existence');
   assertEqual(verifyCalRes.event?.summary, 'Hackathon Project Review with Judges');
 
-  // 4. Gmail Semantic Urgency Classification
+  // 5. Gmail Semantic Urgency Classification
   const paymentEmail = classifyEmailSemantic(
     'Payment system unavailable',
     'Our team cannot process customer payments and the production service is currently down.'
@@ -69,7 +79,7 @@ export async function testGoogleAndTaskIntegration(): Promise<void> {
   assertFalse(newsletterEmail.isUrgent, 'Newsletter must not classify as urgent');
   assertEqual(newsletterEmail.classification, 'NEWSLETTER');
 
-  // 5. Normal Primary Task Creation & Verification
+  // 6. Normal Primary Task Creation & Verification
   setPrimaryFailureSimulation(false);
   const primaryRes = await primaryTaskProvider.createTask({
     title: 'Process VIP Customer Inquiry',
@@ -82,7 +92,7 @@ export async function testGoogleAndTaskIntegration(): Promise<void> {
   const taskVerifyRes = verifyTaskOutcome(primaryRes.task!.id);
   assertTrue(taskVerifyRes.verified, 'Task outcome must be independently verified in store');
 
-  // 6. Resilient Failure Injection & Failover Route
+  // 7. Resilient Failure Injection & Failover Route
   setPrimaryFailureSimulation(true);
   let primaryFailed = false;
   try {
@@ -109,7 +119,7 @@ export async function testGoogleAndTaskIntegration(): Promise<void> {
   // Reset simulation state
   setPrimaryFailureSimulation(false);
 
-  // 7. Natural Language Execution Explainer
+  // 8. Natural Language Execution Explainer
   const auditEvents: any[] = [
     {
       id: 'e1',

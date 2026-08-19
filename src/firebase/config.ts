@@ -27,4 +27,5 @@ googleAuthProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 googleAuthProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 googleAuthProvider.addScope('https://www.googleapis.com/auth/calendar.events');
 googleAuthProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+googleAuthProvider.addScope('https://www.googleapis.com/auth/gmail.send');
 googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
