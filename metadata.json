@@ -1,0 +1,6 @@
+{
+  "name": "AURA — AI Lifestyle & Automation Workflow",
+  "description": "AI-native goal delegation and automation workflow engine powered by Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
