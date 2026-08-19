@@ -3,7 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Type } from '@google/genai';
+export const SchemaType = {
+  STRING: 'STRING',
+  NUMBER: 'NUMBER',
+  INTEGER: 'INTEGER',
+  BOOLEAN: 'BOOLEAN',
+  ARRAY: 'ARRAY',
+  OBJECT: 'OBJECT',
+} as const;
 
 export const WORKFLOW_GENERATION_SYSTEM_INSTRUCTION = `You are AURA, an AI-native Lifestyle & Automation Workflow operating system architect.
 Your motto: "Users define goals. AURA determines how to accomplish them safely and reliably."
@@ -67,56 +74,61 @@ You must provide structured plain-English explanations answering:
 - recoveryExplanation: What will AURA do if something fails?
 - verificationExplanation: How will AURA confirm the goal succeeded?
 
+8. MULTILINGUAL & TAMIL (தமிழ்) NLP COMPREHENSION:
+You fully support and comprehend input goals in Tamil (தமிழ்), Tanglish (Tamil in Latin script), English, and all global languages.
+- When processing Tamil/Tanglish goals (e.g. "அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது..."), accurately deduce the core intent, conditions, tasks, notifications, retries, and safety boundaries.
+- Generate valid, strongly-typed workflow schemas with consistent system action types and appropriate human-readable names and descriptions.
+
 If the user's request asks to modify an existing workflow, preserve the existing workflow's structure and adapt only the targeted properties.`;
 
 export const WORKFLOW_RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
+  type: 'OBJECT',
   properties: {
     name: {
-      type: Type.STRING,
+      type: 'STRING',
       description: 'Clear, concise workflow name (e.g., "Urgent Customer Email Handler")',
     },
     goal: {
-      type: Type.STRING,
+      type: 'STRING',
       description: 'Normalized user goal in concise active voice',
     },
     confidence: {
-      type: Type.NUMBER,
+      type: 'NUMBER',
       description: 'Confidence score from 0.0 to 1.0',
     },
     clarificationNeeded: {
-      type: Type.STRING,
+      type: 'STRING',
       description: 'Optional question or clarification notice if confidence is below 0.85',
     },
     trigger: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
         type: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'One of EMAIL_RECEIVED, SCHEDULE, MANUAL, CALENDAR_EVENT, FORM_SUBMITTED',
         },
         description: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'Human-readable trigger description',
         },
       },
       required: ['type', 'description'],
     },
     conditions: {
-      type: Type.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: Type.OBJECT,
+        type: 'OBJECT',
         properties: {
           type: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'One of EMAIL_URGENT, SENDER_MATCH, SEMANTIC_MATCH, KEYWORD_MATCH, TIME_MATCH, AVAILABILITY, PRIORITY_MATCH',
           },
           value: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'Condition value or target expression',
           },
           description: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'Human-readable condition description',
           },
         },
@@ -124,24 +136,24 @@ export const WORKFLOW_RESPONSE_SCHEMA = {
       },
     },
     actions: {
-      type: Type.ARRAY,
+      type: 'ARRAY',
       items: {
-        type: Type.OBJECT,
+        type: 'OBJECT',
         properties: {
           id: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'Action unique ID like "action-1"',
           },
           type: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'One of CREATE_TASK, SEND_NOTIFICATION, SEND_EMAIL, CREATE_CALENDAR_EVENT, GENERATE_SUMMARY, SAVE_DATA, CALL_WEBHOOK',
           },
           description: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'Human-readable action description',
           },
           priority: {
-            type: Type.STRING,
+            type: 'STRING',
             description: 'One of LOW, MEDIUM, HIGH, CRITICAL',
           },
         },
@@ -149,72 +161,72 @@ export const WORKFLOW_RESPONSE_SCHEMA = {
       },
     },
     recovery: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
         enabled: {
-          type: Type.BOOLEAN,
+          type: 'BOOLEAN',
           description: 'Whether recovery is enabled',
         },
         strategy: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'One of NONE, RETRY, FALLBACK, RETRY_THEN_FALLBACK, REQUEST_USER',
         },
         retryCount: {
-          type: Type.INTEGER,
+          type: 'INTEGER',
           description: 'Number of retries (e.g. 2 or 3)',
         },
         fallback: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'Name of fallback provider or action (e.g. "BACKUP_TASK_PROVIDER")',
         },
         description: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'Human-readable recovery plan description',
         },
       },
       required: ['enabled', 'strategy'],
     },
     verification: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
         type: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'One of TASK_EXISTS, EMAIL_SENT, EVENT_EXISTS, DATA_SAVED, WEBHOOK_SUCCESS, USER_CONFIRMATION',
         },
         description: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'How outcome will be verified',
         },
       },
       required: ['type', 'description'],
     },
     explainability: {
-      type: Type.OBJECT,
+      type: 'OBJECT',
       properties: {
         understoodIntent: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'Concise explanation of what AURA understood the user wants to achieve',
         },
         planSteps: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: 'ARRAY',
+          items: { type: 'STRING' },
           description: 'Numbered steps in the execution plan',
         },
         actionJustification: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'Why these specific actions are necessary to achieve the goal',
         },
         failureModes: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: 'ARRAY',
+          items: { type: 'STRING' },
           description: 'What external or system errors could occur during execution',
         },
         recoveryExplanation: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'What AURA will specifically do if failures happen',
         },
         verificationExplanation: {
-          type: Type.STRING,
+          type: 'STRING',
           description: 'How AURA independently verifies the outcome has been achieved',
         },
       },

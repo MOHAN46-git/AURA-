@@ -12,26 +12,119 @@ import { validateWorkflow } from './validator.ts';
 export function generateClientWorkflow(prompt: string): Workflow {
   const p = prompt.toLowerCase();
 
-  const isEmail = p.includes('email') || p.includes('inbox') || p.includes('message');
-  const isUrgent = p.includes('urgent') || p.includes('emergency') || p.includes('priority') || p.includes('customer');
-  const isTask = p.includes('task') || p.includes('todo') || p.includes('action item');
-  const isNotify = p.includes('notify') || p.includes('alert') || p.includes('ping');
-  const isSummary = p.includes('summary') || p.includes('summarize') || p.includes('report') || p.includes('updates');
-  const isCalendar = p.includes('calendar') || p.includes('meeting') || p.includes('schedule') || p.includes('event');
-  const isFallback = p.includes('fail') || p.includes('backup') || p.includes('retry') || p.includes('even if');
-  const isSendEmail = p.includes('send email') || p.includes('send external') || p.includes('outbound');
-  const isWebhook = p.includes('webhook') || p.includes('api call');
+  const isEmail =
+    p.includes('email') ||
+    p.includes('inbox') ||
+    p.includes('message') ||
+    p.includes('மின்னஞ்சல்') ||
+    p.includes('செய்தி') ||
+    p.includes('மடல்') ||
+    p.includes('மெயில்');
+
+  const isUrgent =
+    p.includes('urgent') ||
+    p.includes('emergency') ||
+    p.includes('priority') ||
+    p.includes('customer') ||
+    p.includes('அவசர') ||
+    p.includes('அவசரம்') ||
+    p.includes('முக்கிய') ||
+    p.includes('முக்கியம்') ||
+    p.includes('வாடிக்கையாளர்') ||
+    p.includes('avasaram') ||
+    p.includes('mukkiam');
+
+  const isTask =
+    p.includes('task') ||
+    p.includes('todo') ||
+    p.includes('action item') ||
+    p.includes('பணி') ||
+    p.includes('வேலை') ||
+    p.includes('செயல்') ||
+    p.includes('டாஸ்க்') ||
+    p.includes('pani') ||
+    p.includes('velai');
+
+  const isNotify =
+    p.includes('notify') ||
+    p.includes('alert') ||
+    p.includes('ping') ||
+    p.includes('அறிவி') ||
+    p.includes('அறிவிப்பு') ||
+    p.includes('தெரிவி') ||
+    p.includes('தெரிவிக்கவும்') ||
+    p.includes('arivippu') ||
+    p.includes('therivikavum');
+
+  const isSummary =
+    p.includes('summary') ||
+    p.includes('summarize') ||
+    p.includes('report') ||
+    p.includes('updates') ||
+    p.includes('சுருக்க') ||
+    p.includes('விவர') ||
+    p.includes('அறிக்கை') ||
+    p.includes('surukk') ||
+    p.includes('arikkai');
+
+  const isCalendar =
+    p.includes('calendar') ||
+    p.includes('meeting') ||
+    p.includes('schedule') ||
+    p.includes('event') ||
+    p.includes('நாள்காட்டி') ||
+    p.includes('கூட்டம்') ||
+    p.includes('நேரம்') ||
+    p.includes('மீட்டிங்') ||
+    p.includes('koottam') ||
+    p.includes('naalkaatti');
+
+  const isFallback =
+    p.includes('fail') ||
+    p.includes('backup') ||
+    p.includes('retry') ||
+    p.includes('even if') ||
+    p.includes('தோல்வி') ||
+    p.includes('தோற்றால்') ||
+    p.includes('மாற்று') ||
+    p.includes('மீண்டும்') ||
+    p.includes('thotral') ||
+    p.includes('meendum') ||
+    p.includes('maattru');
+
+  const isSendEmail =
+    p.includes('send email') ||
+    p.includes('send external') ||
+    p.includes('outbound') ||
+    p.includes('மின்னஞ்சல் அனுப்பு') ||
+    p.includes('மெயில் அனுப்பு') ||
+    p.includes('email anuppu');
+
+  const isWebhook = p.includes('webhook') || p.includes('api call') || p.includes('வலைக்கொக்கி');
 
   let triggerType: any = 'EMAIL_RECEIVED';
   let triggerDesc = 'When a new email arrives';
 
-  if (p.includes('every monday') || p.includes('daily') || p.includes('weekly') || p.includes('every morning') || p.includes('schedule')) {
+  if (
+    p.includes('every monday') ||
+    p.includes('daily') ||
+    p.includes('weekly') ||
+    p.includes('every morning') ||
+    p.includes('schedule') ||
+    p.includes('திங்கட்கிழமை') ||
+    p.includes('திங்கள்') ||
+    p.includes('தினமும்') ||
+    p.includes('வாரம்') ||
+    p.includes('காலை') ||
+    p.includes('thingal') ||
+    p.includes('thinamum')
+  ) {
     triggerType = 'SCHEDULE';
-    triggerDesc = p.includes('monday') ? 'Every Monday at 09:00 AM' : 'Scheduled recurring timer';
-  } else if (p.includes('calendar') && (p.includes('before') || p.includes('after') || p.includes('event created'))) {
+    triggerDesc = (p.includes('monday') || p.includes('திங்கள்')) ? 'Every Monday at 09:00 AM' : 'Scheduled recurring timer';
+  } else if (p.includes('calendar') || p.includes('நாள்காட்டி') || p.includes('கூட்டம்') && (p.includes('before') || p.includes('after') || p.includes('event created'))) {
     triggerType = 'CALENDAR_EVENT';
     triggerDesc = 'When a calendar event is scheduled or updated';
-  } else if (!isEmail && !p.includes('every')) {
+  } else if (!isEmail && !p.includes('every') && !p.includes('தினமும்')) {
     triggerType = 'MANUAL';
     triggerDesc = 'When manually triggered by user';
   }
@@ -43,13 +136,13 @@ export function generateClientWorkflow(prompt: string): Workflow {
       value: 'urgent customer request',
       description: 'Determine whether the email represents an urgent customer request',
     });
-  } else if (p.includes('customer')) {
+  } else if (p.includes('customer') || p.includes('வாடிக்கையாளர்')) {
     conditions.push({
       type: 'SENDER_MATCH' as const,
       value: 'customer domain',
       description: 'Check if sender belongs to active customer accounts',
     });
-  } else if (isCalendar && p.includes('conflict')) {
+  } else if ((isCalendar || p.includes('நாள்காட்டி')) && (p.includes('conflict') || p.includes('மோதல்') || p.includes('இணை'))) {
     conditions.push({
       type: 'AVAILABILITY' as const,
       description: 'Check for calendar conflicts and available open slots',
@@ -106,7 +199,7 @@ export function generateClientWorkflow(prompt: string): Workflow {
     });
   }
 
-  const retryCount = p.includes('three') || p.includes('3 times') ? 3 : 2;
+  const retryCount = (p.includes('three') || p.includes('3 times') || p.includes('3 முறை') || p.includes('மூன்று முறை')) ? 3 : 2;
   const recovery = {
     enabled: isFallback || isUrgent || actions.some((a) => a.type === 'CREATE_TASK'),
     strategy: isFallback ? ('RETRY_THEN_FALLBACK' as const) : ('RETRY' as const),

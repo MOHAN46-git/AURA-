@@ -15,8 +15,29 @@ import { testNoFallbackSafeStop } from './integration/noFallback.test.ts';
 import { testVerificationFailure } from './integration/verificationFailure.test.ts';
 import { testApprovalAndUnsupportedFlow } from './integration/approvalFlow.test.ts';
 import { testIdempotencyAndKillSwitch } from './integration/idempotencyKillSwitch.test.ts';
+import { testAiProviderDetection } from './unit/aiProvider.test.ts';
+import { testTamilNlpEngine } from './unit/tamilNlp.test.ts';
+import { testGoogleAndTaskIntegration } from './integration/googleIntegration.test.ts';
 
 export const ALL_AURA_TESTS: TestCase[] = [
+  {
+    id: 'test-google-task-integration',
+    name: 'Google Services (Calendar/Gmail), Task Failover & Outcome Verification',
+    category: 'integration',
+    fn: testGoogleAndTaskIntegration,
+  },
+  {
+    id: 'test-tamil-nlp-engine',
+    name: 'Tamil (தமிழ்) & Multilingual NLP Intent Compilation',
+    category: 'unit',
+    fn: testTamilNlpEngine,
+  },
+  {
+    id: 'test-ai-provider-detection',
+    name: 'AI Provider & Grok (xAI) API Key Auto-Detection',
+    category: 'unit',
+    fn: testAiProviderDetection,
+  },
   {
     id: 'test-schema-validation',
     name: 'Workflow Schema & Malformed Structure Validation',

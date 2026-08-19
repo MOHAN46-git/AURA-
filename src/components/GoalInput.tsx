@@ -44,6 +44,11 @@ const VOICE_PRESETS = [
     speech:
       'When a VIP client requests a meeting via email, check my Google Calendar for open 45-minute afternoon windows and draft a confirmation invite.',
   },
+  {
+    label: 'தமிழ் அவசர மின்னஞ்சல் (Tamil Voice)',
+    speech:
+      'அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது, உயர் முன்னுரிமை பணியை உருவாக்கி எனக்கு உடனடியாக தெரிவிக்கவும்.',
+  },
 ];
 
 export const GoalInput: React.FC<GoalInputProps> = ({

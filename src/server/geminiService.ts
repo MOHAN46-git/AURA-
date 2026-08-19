@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI } from '@google/genai';
 import {
   WORKFLOW_GENERATION_SYSTEM_INSTRUCTION,
   WORKFLOW_RESPONSE_SCHEMA,
@@ -11,16 +10,75 @@ import {
 import { validateWorkflow } from '../workflow/validator.ts';
 import { Workflow } from '../workflow/types.ts';
 
-let aiClient: GoogleGenAI | null = null;
+let geminiClient: any = null;
 
-function getAiClient(): GoogleGenAI | null {
-  if (aiClient) return aiClient;
+export interface AiProviderInfo {
+  provider: 'grok' | 'gemini' | 'deterministic';
+  model: string;
+  hasKey: boolean;
+}
+
+/**
+ * Detects the active AI provider based on environment variables.
+ * Automatically recognizes GROK_API_KEY, XAI_API_KEY, and Gemini keys.
+ * Also auto-detects xAI keys (prefixed with 'xai-') even if placed in GEMINI_API_KEY.
+ */
+export function getAiProviderInfo(): AiProviderInfo {
+  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+  if (grokKey && grokKey !== 'MY_GROK_API_KEY' && grokKey !== 'your_grok_api_key_here' && grokKey.trim()) {
+    return {
+      provider: 'grok',
+      model: 'grok-2-latest',
+      hasKey: true,
+    };
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey && geminiKey !== 'MY_GEMINI_API_KEY' && geminiKey.trim()) {
+    if (geminiKey.startsWith('xai-')) {
+      return {
+        provider: 'grok',
+        model: 'grok-2-latest',
+        hasKey: true,
+      };
+    }
+    return {
+      provider: 'gemini',
+      model: 'gemini-3.7-flash',
+      hasKey: true,
+    };
+  }
+
+  return {
+    provider: 'deterministic',
+    model: 'heuristic-engine',
+    hasKey: false,
+  };
+}
+
+function getGrokApiKey(): string | null {
+  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+  if (grokKey && grokKey !== 'MY_GROK_API_KEY' && grokKey !== 'your_grok_api_key_here' && grokKey.trim()) {
+    return grokKey.trim();
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey && geminiKey.startsWith('xai-')) {
+    return geminiKey.trim();
+  }
+
+  return null;
+}
+
+async function getGeminiClient(): Promise<any> {
+  if (geminiClient) return geminiClient;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.startsWith('xai-')) {
     return null;
   }
   try {
-    aiClient = new GoogleGenAI({
+    const { GoogleGenAI } = await import('@google/genai');
+    geminiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
         headers: {
@@ -28,11 +86,96 @@ function getAiClient(): GoogleGenAI | null {
         },
       },
     });
-    return aiClient;
+    return geminiClient;
   } catch (err) {
-    console.error('[AURA Server] Failed to initialize GoogleGenAI client:', err);
+    console.warn('[AURA Server] Optional @google/genai module not loaded:', err);
     return null;
   }
+}
+
+/**
+ * Strips markdown code blocks and trims JSON strings safely.
+ */
+function cleanJsonResponse(raw: string): string {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  return cleaned;
+}
+
+/**
+ * Calls Grok (xAI API) with automatic retries and model failover across candidate models.
+ */
+async function callGrokWithFailover(
+  apiKey: string,
+  userPrompt: string,
+  systemInstruction: string
+): Promise<string | null> {
+  const candidateModels = ['grok-3-mini', 'grok-3', 'grok-2', 'grok-2-latest', 'grok-beta', 'grok-2-1212'];
+
+  const systemMessage = `${systemInstruction}
+
+CRITICAL: Return ONLY a valid, single JSON object without explanation or markdown backticks.`;
+
+  for (const model of candidateModels) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: 'system',
+                content: systemMessage,
+              },
+              {
+                role: 'user',
+                content: userPrompt,
+              },
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`[AURA Server] Grok model ${model} returned HTTP ${response.status}:`, errText);
+
+          if ((response.status === 429 || response.status === 503) && attempt === 1) {
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+          break; // Try next model candidate
+        }
+
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content?.trim();
+        if (text) {
+          return cleanJsonResponse(text);
+        }
+      } catch (err: any) {
+        console.warn(`[AURA Server] Grok model ${model} attempt ${attempt} error:`, err?.message || err);
+        if (attempt === 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          continue;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -43,7 +186,7 @@ async function callGeminiWithFailover(
   contents: string,
   systemInstruction: string
 ): Promise<string | null> {
-  const ai = getAiClient();
+  const ai = await getGeminiClient();
   if (!ai) return null;
 
   const candidateModels = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
@@ -64,25 +207,23 @@ async function callGeminiWithFailover(
 
         const text = response.text?.trim();
         if (text) {
-          return text;
+          return cleanJsonResponse(text);
         }
       } catch (err: any) {
         const isUnavailable = err?.message?.includes('503') || err?.message?.includes('demand') || err?.status === 503;
         const isRateLimited = err?.message?.includes('429') || err?.status === 429;
 
         if ((isUnavailable || isRateLimited) && attempt === 1) {
-          // Wait briefly with backoff before retry or model failover
           await new Promise((r) => setTimeout(r, 600));
           continue;
         }
 
-        // If this model is currently experiencing high demand, try next model in candidateModels
         if (isUnavailable || isRateLimited) {
-          console.warn(`[AURA Server] Model ${model} is experiencing high demand, falling over to next available model...`);
+          console.warn(`[AURA Server] Gemini model ${model} is experiencing high demand, falling over...`);
           break;
         }
 
-        console.warn(`[AURA Server] Model ${model} returned error:`, err?.message || err);
+        console.warn(`[AURA Server] Gemini model ${model} error:`, err?.message || err);
         break;
       }
     }
@@ -92,7 +233,28 @@ async function callGeminiWithFailover(
 }
 
 /**
- * Interprets a natural language goal using Gemini and returns a validated Workflow.
+ * Dispatches prompt to active AI provider (Grok -> Gemini -> fallback).
+ */
+async function callAiWithFailover(
+  userPrompt: string,
+  systemInstruction: string
+): Promise<string | null> {
+  // 1. Check Grok key
+  const grokApiKey = getGrokApiKey();
+  if (grokApiKey) {
+    const grokResult = await callGrokWithFailover(grokApiKey, userPrompt, systemInstruction);
+    if (grokResult) return grokResult;
+  }
+
+  // 2. Check Gemini client
+  const geminiResult = await callGeminiWithFailover(userPrompt, systemInstruction);
+  if (geminiResult) return geminiResult;
+
+  return null;
+}
+
+/**
+ * Interprets a natural language goal using Grok / Gemini and returns a validated Workflow.
  */
 export async function generateWorkflowFromGoal(goalPrompt: string): Promise<Workflow> {
   const cleanPrompt = goalPrompt.trim();
@@ -104,7 +266,7 @@ export async function generateWorkflowFromGoal(goalPrompt: string): Promise<Work
     const contents = `Translate this human automation goal into a safe, strongly-typed AURA workflow:
 User Goal: "${cleanPrompt}"`;
 
-    const responseText = await callGeminiWithFailover(
+    const responseText = await callAiWithFailover(
       contents,
       WORKFLOW_GENERATION_SYSTEM_INSTRUCTION
     );
@@ -120,7 +282,7 @@ User Goal: "${cleanPrompt}"`;
       }
     }
   } catch (err) {
-    console.warn('[AURA Server] Gemini compilation engaged resilient heuristic engine:', err);
+    console.warn('[AURA Server] AI compilation engaged resilient heuristic engine:', err);
   }
 
   // Resilient deterministic generator fallback (guarantees 100% availability for all user goals)
@@ -149,7 +311,7 @@ User Modification Request:
 
 Modify the workflow JSON to apply the requested changes while keeping unchanged fields intact.`;
 
-    const responseText = await callGeminiWithFailover(
+    const responseText = await callAiWithFailover(
       prompt,
       WORKFLOW_GENERATION_SYSTEM_INSTRUCTION
     );
@@ -178,28 +340,121 @@ Modify the workflow JSON to apply the requested changes while keeping unchanged 
 function generateDeterministicWorkflow(prompt: string): Workflow {
   const p = prompt.toLowerCase();
 
-  // Primary demo prompts & keyword matching
-  const isEmail = p.includes('email') || p.includes('inbox') || p.includes('message');
-  const isUrgent = p.includes('urgent') || p.includes('emergency') || p.includes('priority') || p.includes('customer');
-  const isTask = p.includes('task') || p.includes('todo') || p.includes('action item');
-  const isNotify = p.includes('notify') || p.includes('alert') || p.includes('ping');
-  const isSummary = p.includes('summary') || p.includes('summarize') || p.includes('report') || p.includes('updates');
-  const isCalendar = p.includes('calendar') || p.includes('meeting') || p.includes('schedule') || p.includes('event');
-  const isFallback = p.includes('fail') || p.includes('backup') || p.includes('retry') || p.includes('even if');
-  const isSendEmail = p.includes('send email') || p.includes('send external') || p.includes('outbound');
-  const isWebhook = p.includes('webhook') || p.includes('api call');
+  // Primary demo prompts & keyword matching (English & Tamil / தமிழ்)
+  const isEmail =
+    p.includes('email') ||
+    p.includes('inbox') ||
+    p.includes('message') ||
+    p.includes('மின்னஞ்சல்') ||
+    p.includes('செய்தி') ||
+    p.includes('மடல்') ||
+    p.includes('மெயில்');
+
+  const isUrgent =
+    p.includes('urgent') ||
+    p.includes('emergency') ||
+    p.includes('priority') ||
+    p.includes('customer') ||
+    p.includes('அவசர') ||
+    p.includes('அவசரம்') ||
+    p.includes('முக்கிய') ||
+    p.includes('முக்கியம்') ||
+    p.includes('வாடிக்கையாளர்') ||
+    p.includes('avasaram') ||
+    p.includes('mukkiam');
+
+  const isTask =
+    p.includes('task') ||
+    p.includes('todo') ||
+    p.includes('action item') ||
+    p.includes('பணி') ||
+    p.includes('வேலை') ||
+    p.includes('செயல்') ||
+    p.includes('டாஸ்க்') ||
+    p.includes('pani') ||
+    p.includes('velai');
+
+  const isNotify =
+    p.includes('notify') ||
+    p.includes('alert') ||
+    p.includes('ping') ||
+    p.includes('அறிவி') ||
+    p.includes('அறிவிப்பு') ||
+    p.includes('தெரிவி') ||
+    p.includes('தெரிவிக்கவும்') ||
+    p.includes('arivippu') ||
+    p.includes('therivikavum');
+
+  const isSummary =
+    p.includes('summary') ||
+    p.includes('summarize') ||
+    p.includes('report') ||
+    p.includes('updates') ||
+    p.includes('சுருக்க') ||
+    p.includes('விவர') ||
+    p.includes('அறிக்கை') ||
+    p.includes('surukk') ||
+    p.includes('arikkai');
+
+  const isCalendar =
+    p.includes('calendar') ||
+    p.includes('meeting') ||
+    p.includes('schedule') ||
+    p.includes('event') ||
+    p.includes('நாள்காட்டி') ||
+    p.includes('கூட்டம்') ||
+    p.includes('நேரம்') ||
+    p.includes('மீட்டிங்') ||
+    p.includes('koottam') ||
+    p.includes('naalkaatti');
+
+  const isFallback =
+    p.includes('fail') ||
+    p.includes('backup') ||
+    p.includes('retry') ||
+    p.includes('even if') ||
+    p.includes('தோல்வி') ||
+    p.includes('தோற்றால்') ||
+    p.includes('மாற்று') ||
+    p.includes('மீண்டும்') ||
+    p.includes('thotral') ||
+    p.includes('meendum') ||
+    p.includes('maattru');
+
+  const isSendEmail =
+    p.includes('send email') ||
+    p.includes('send external') ||
+    p.includes('outbound') ||
+    p.includes('மின்னஞ்சல் அனுப்பு') ||
+    p.includes('மெயில் அனுப்பு') ||
+    p.includes('email anuppu');
+
+  const isWebhook = p.includes('webhook') || p.includes('api call') || p.includes('வலைக்கொக்கி');
 
   // Trigger
   let triggerType: any = 'EMAIL_RECEIVED';
   let triggerDesc = 'When a new email arrives';
 
-  if (p.includes('every monday') || p.includes('daily') || p.includes('weekly') || p.includes('every morning') || p.includes('schedule')) {
+  if (
+    p.includes('every monday') ||
+    p.includes('daily') ||
+    p.includes('weekly') ||
+    p.includes('every morning') ||
+    p.includes('schedule') ||
+    p.includes('திங்கட்கிழமை') ||
+    p.includes('திங்கள்') ||
+    p.includes('தினமும்') ||
+    p.includes('வாரம்') ||
+    p.includes('காலை') ||
+    p.includes('thingal') ||
+    p.includes('thinamum')
+  ) {
     triggerType = 'SCHEDULE';
-    triggerDesc = p.includes('monday') ? 'Every Monday at 09:00 AM' : 'Scheduled recurring timer';
-  } else if (p.includes('calendar') && (p.includes('before') || p.includes('after') || p.includes('event created'))) {
+    triggerDesc = (p.includes('monday') || p.includes('திங்கள்')) ? 'Every Monday at 09:00 AM' : 'Scheduled recurring timer';
+  } else if (p.includes('calendar') || p.includes('நாள்காட்டி') || p.includes('கூட்டம்') && (p.includes('before') || p.includes('after') || p.includes('event created'))) {
     triggerType = 'CALENDAR_EVENT';
     triggerDesc = 'When a calendar event is scheduled or updated';
-  } else if (!isEmail && !p.includes('every')) {
+  } else if (!isEmail && !p.includes('every') && !p.includes('தினமும்')) {
     triggerType = 'MANUAL';
     triggerDesc = 'When manually triggered by user';
   }
@@ -212,13 +467,13 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
       value: 'urgent customer request',
       description: 'Determine whether the email represents an urgent customer request',
     });
-  } else if (p.includes('customer')) {
+  } else if (p.includes('customer') || p.includes('வாடிக்கையாளர்')) {
     conditions.push({
       type: 'SENDER_MATCH' as const,
       value: 'customer domain',
       description: 'Check if sender belongs to active customer accounts',
     });
-  } else if (isCalendar && p.includes('conflict')) {
+  } else if ((isCalendar || p.includes('நாள்காட்டி')) && (p.includes('conflict') || p.includes('மோதல்') || p.includes('இணை'))) {
     conditions.push({
       type: 'AVAILABILITY' as const,
       description: 'Check for calendar conflicts and available open slots',
@@ -277,7 +532,7 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
   }
 
   // Recovery
-  const retryCount = p.includes('three') || p.includes('3 times') ? 3 : 2;
+  const retryCount = (p.includes('three') || p.includes('3 times') || p.includes('3 முறை') || p.includes('மூன்று முறை')) ? 3 : 2;
   const recovery = {
     enabled: isFallback || isUrgent || actions.some((a) => a.type === 'CREATE_TASK'),
     strategy: isFallback ? ('RETRY_THEN_FALLBACK' as const) : ('RETRY' as const),
@@ -300,7 +555,7 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
       : 'Confirm operation execution receipt',
   };
 
-  const confidence = prompt.length > 15 ? 0.96 : 0.75;
+  const confidence = prompt.length > 10 ? 0.96 : 0.75;
   const rawObj = {
     name: isUrgent && isEmail ? 'Urgent Customer Email Handler' : (isSummary ? 'Weekly Project Summary' : 'Intelligent Automation Plan'),
     goal: prompt,
@@ -342,43 +597,43 @@ function applyDeterministicEdit(current: Workflow, instruction: string): Workflo
   const inst = instruction.toLowerCase();
   const updated = JSON.parse(JSON.stringify(current)) as Workflow;
 
-  if (inst.includes('retry 3') || inst.includes('three times') || inst.includes('retry three')) {
+  if (inst.includes('retry 3') || inst.includes('three times') || inst.includes('retry three') || inst.includes('3 முறை') || inst.includes('மூன்று முறை')) {
     updated.recovery.enabled = true;
     updated.recovery.retryCount = 3;
     updated.recovery.strategy = updated.recovery.fallback ? 'RETRY_THEN_FALLBACK' : 'RETRY';
     updated.recovery.description = `Retry 3 times ${updated.recovery.fallback ? 'then failover to backup provider' : 'on failure'}`;
   }
 
-  if (inst.includes('retry twice') || inst.includes('2 times') || inst.includes('retry 2')) {
+  if (inst.includes('retry twice') || inst.includes('2 times') || inst.includes('retry 2') || inst.includes('2 முறை') || inst.includes('இரண்டு முறை')) {
     updated.recovery.enabled = true;
     updated.recovery.retryCount = 2;
     updated.recovery.strategy = updated.recovery.fallback ? 'RETRY_THEN_FALLBACK' : 'RETRY';
   }
 
-  if (inst.includes('ask me') || inst.includes('approval') || inst.includes('confirm before')) {
+  if (inst.includes('ask me') || inst.includes('approval') || inst.includes('confirm before') || inst.includes('ஒப்புதல்') || inst.includes('கேட்கவும்') || inst.includes('opputhal')) {
     updated.approvalRequired = true;
     updated.explainability.planSteps.unshift('AURA prompts user for confirmation prior to executing step.');
   }
 
-  if (inst.includes('no approval') || inst.includes('auto execute') || inst.includes('remove approval')) {
+  if (inst.includes('no approval') || inst.includes('auto execute') || inst.includes('remove approval') || inst.includes('ஒப்புதல் தேவையில்லை')) {
     if (updated.risk.level !== 'HIGH' && updated.risk.level !== 'CRITICAL') {
       updated.approvalRequired = false;
     }
   }
 
-  if (inst.includes('high priority') || inst.includes('priority to high')) {
+  if (inst.includes('high priority') || inst.includes('priority to high') || inst.includes('உயர் முன்னுரிமை')) {
     updated.actions.forEach((a) => {
       if (a.type === 'CREATE_TASK') a.priority = 'HIGH';
     });
   }
 
-  if (inst.includes('medium priority') || inst.includes('priority to medium')) {
+  if (inst.includes('medium priority') || inst.includes('priority to medium') || inst.includes('நடுத்தர முன்னுரிமை')) {
     updated.actions.forEach((a) => {
       if (a.type === 'CREATE_TASK') a.priority = 'MEDIUM';
     });
   }
 
-  if (inst.includes('backup') && !updated.recovery.fallback) {
+  if ((inst.includes('backup') || inst.includes('மாற்று')) && !updated.recovery.fallback) {
     updated.recovery.enabled = true;
     updated.recovery.strategy = 'RETRY_THEN_FALLBACK';
     updated.recovery.fallback = 'BACKUP_TASK_PROVIDER';

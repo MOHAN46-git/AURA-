@@ -15,6 +15,9 @@ import {
   Terminal,
   ShieldCheck,
   Zap,
+  Sparkles,
+  HelpCircle,
+  MessageSquare,
 } from 'lucide-react';
 
 export interface ExecutionLogEntry {
@@ -46,6 +49,64 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'RECOVERED' | 'FAILED'>('ALL');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [explainingLogId, setExplainingLogId] = useState<string | null>(null);
+  const [logExplanations, setLogExplanations] = useState<Record<string, string>>({});
+  const [loadingExplainer, setLoadingExplainer] = useState(false);
+
+  const handleExplainExecution = async (log: ExecutionLogEntry) => {
+    if (logExplanations[log.id]) {
+      setExplainingLogId(explainingLogId === log.id ? null : log.id);
+      return;
+    }
+
+    setLoadingExplainer(true);
+    setExplainingLogId(log.id);
+
+    try {
+      // Synthesize structured audit events from log traces
+      const auditEvents = log.logs.map((l, idx) => ({
+        id: `ev-${idx}`,
+        executionId: log.id,
+        workflowId: log.workflowId,
+        sequence: idx + 1,
+        timestamp: new Date().toISOString(),
+        eventType: l.includes('fail') || l.includes('503') || l.includes('FAIL')
+          ? 'PRIMARY_ACTION_FAILED'
+          : l.includes('Recover') || l.includes('Backup')
+          ? 'FALLBACK_EXECUTED'
+          : l.includes('Retry')
+          ? 'RETRY_1_STARTED'
+          : l.includes('Verified')
+          ? 'OUTCOME_VERIFICATION_CONFIRMED'
+          : 'ACTION_STARTED',
+        type: 'ACTION_STARTED',
+        title: l.split(':')[0] || 'Step',
+        message: l,
+        status: l.includes('fail') || l.includes('503') ? 'ERROR' : l.includes('Verified') ? 'SUCCESS' : 'INFO',
+      }));
+
+      const res = await fetch('/api/explain-execution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: 'What happened during this execution and why?',
+          auditEvents,
+          workflowName: log.workflowName,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.summary) {
+          setLogExplanations((prev) => ({ ...prev, [log.id]: data.summary }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to generate execution explanation:', err);
+    } finally {
+      setLoadingExplainer(false);
+    }
+  };
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -54,12 +115,11 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
       log.details.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || log.status === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -69,10 +129,10 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
             </span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Execution Logs & History
+            Execution Logs & Telemetry
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time telemetry of all autonomous workflow dispatches, verifications, and failovers
+            Real-time audit receipts of all autonomous dispatches, verifications, and failover self-healing paths
           </p>
         </div>
 
@@ -80,7 +140,7 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
           {logs.length > 0 && (
             <button
               onClick={onClearLogs}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span>Clear History</span>
@@ -100,57 +160,51 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
+            placeholder="Search execution traces, triggers, details..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search execution logs or events..."
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-4 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
           />
         </div>
 
-        <div className="flex items-center gap-1 self-end sm:self-auto">
-          {(['ALL', 'SUCCESS', 'RECOVERED', 'FAILED'] as const).map((st) => (
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs font-medium text-slate-600">Status:</span>
+          {(['ALL', 'SUCCESS', 'RECOVERED', 'FAILED'] as const).map((s) => (
             <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`rounded-lg px-3 py-1 text-xs font-mono font-bold transition-all ${
-                statusFilter === st
-                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                  : 'text-slate-500 hover:text-slate-800'
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                statusFilter === s
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
-              {st}
+              {s}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Logs Table / List */}
+      {/* Log List */}
       {filteredLogs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center space-y-2">
-          <Terminal className="h-8 w-8 text-slate-300 mx-auto" />
-          <p className="text-sm font-bold text-slate-700">No execution logs found.</p>
-          <p className="text-xs text-slate-400">
-            Trigger a test run or simulate an automation to view real-time execution receipts.
+        <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center bg-white">
+          <Terminal className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No execution logs match</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+            Trigger a workflow from the Studio or click "Trigger Test Event" to produce live receipts.
           </p>
-          {workflows.length > 0 && (
-            <button
-              onClick={() => onTriggerTestRun(workflows[0])}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 shadow-md shadow-indigo-100"
-            >
-              <Zap className="h-3.5 w-3.5" />
-              <span>Simulate Dispatch Now</span>
-            </button>
-          )}
         </div>
       ) : (
         <div className="space-y-3">
           {filteredLogs.map((log) => {
             const isExpanded = expandedLogId === log.id;
+            const isExplaining = explainingLogId === log.id;
+            const explanation = logExplanations[log.id];
 
             return (
               <div
@@ -160,22 +214,14 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 border border-slate-200">
-                      {log.status === 'SUCCESS' && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      )}
-                      {log.status === 'RECOVERED' && (
-                        <RotateCw className="h-4 w-4 text-indigo-600" />
-                      )}
-                      {log.status === 'FAILED' && (
-                        <XCircle className="h-4 w-4 text-rose-600" />
-                      )}
+                      {log.status === 'SUCCESS' && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                      {log.status === 'RECOVERED' && <RotateCw className="h-4 w-4 text-indigo-600" />}
+                      {log.status === 'FAILED' && <XCircle className="h-4 w-4 text-rose-600" />}
                     </div>
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">
-                          {log.workflowName}
-                        </span>
+                        <span className="text-sm font-bold text-slate-900">{log.workflowName}</span>
                         <span
                           className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded border uppercase ${
                             log.status === 'SUCCESS'
@@ -194,12 +240,22 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                    className="text-xs font-bold font-mono text-indigo-600 hover:text-indigo-800 self-start sm:self-center underline decoration-indigo-200"
-                  >
-                    {isExpanded ? 'Hide Trace' : 'View Trace'}
-                  </button>
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    <button
+                      onClick={() => handleExplainExecution(log)}
+                      className="flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                    >
+                      <Sparkles className="h-3 w-3 text-indigo-500" />
+                      <span>{isExplaining && explanation ? 'Hide AI Explanation' : 'Explain Execution'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      className="text-xs font-bold font-mono text-slate-600 hover:text-slate-900 underline decoration-slate-300"
+                    >
+                      {isExpanded ? 'Hide Trace' : 'View Trace'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
@@ -210,6 +266,21 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
                     </span>
                   )}
                 </div>
+
+                {/* Natural Language Explanation Box */}
+                {isExplaining && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-1.5 animate-fade-in">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>AURA Audit Trail Explanation (Evidence-Based)</span>
+                    </div>
+                    {loadingExplainer && !explanation ? (
+                      <p className="text-xs text-indigo-700 animate-pulse">AURA is synthesizing audit receipts...</p>
+                    ) : (
+                      <p className="text-xs text-slate-700 leading-relaxed">{explanation}</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Expanded Console Logs Trace */}
                 {isExpanded && (
@@ -222,11 +293,11 @@ export const ExecutionLogsView: React.FC<ExecutionLogsViewProps> = ({
                       <div
                         key={idx}
                         className={`flex items-start gap-1.5 ${
-                          l.includes('ERROR')
+                          l.includes('ERROR') || l.includes('503') || l.includes('failed')
                             ? 'text-rose-400'
-                            : l.includes('SUCCESS')
+                            : l.includes('SUCCESS') || l.includes('verified') || l.includes('Verified')
                             ? 'text-emerald-400'
-                            : l.includes('CircuitBreaker') || l.includes('Recovered') || l.includes('Resilience')
+                            : l.includes('CircuitBreaker') || l.includes('Recovered') || l.includes('Resilience') || l.includes('Fallback')
                             ? 'text-orange-300'
                             : 'text-slate-400'
                         }`}

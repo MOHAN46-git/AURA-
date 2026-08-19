@@ -56,4 +56,18 @@ export const EXAMPLE_GOALS: ExampleGoal[] = [
     tag: 'Safety Guardrail',
     expectedOutcome: 'Enforces human-in-the-loop review policy before outbound SMTP dispatch.',
   },
+  {
+    id: 'demo-tamil-1',
+    title: 'அவசர மின்னஞ்சல் & பணி உருவாக்கம் (Tamil Triage)',
+    goal: 'அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது, உயர் முன்னுரிமை பணியை உருவாக்கி எனக்கு உடனடியாக தெரிவிக்கவும்.',
+    tag: 'தமிழ் NLP ★',
+    expectedOutcome: 'Processes Tamil intent: detects urgent email, creates high-priority task, and sends push notification.',
+  },
+  {
+    id: 'demo-tamil-2',
+    title: 'திங்கட்கிழமை திட்ட அறிக்கை (Monday Tamil Summary)',
+    goal: 'ஒவ்வொரு திங்கட்கிழமையும் காலை 9 மணிக்கு எனது திட்டங்களின் சுருக்கத்தை உருவாக்கி அனுப்பவும்.',
+    tag: 'தமிழ் Schedule',
+    expectedOutcome: 'Schedules weekly Monday 9 AM summary in Tamil NLP.',
+  },
 ];

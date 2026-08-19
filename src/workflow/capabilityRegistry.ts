@@ -175,7 +175,7 @@ export const SUPPORTED_ACTIONS: Record<ActionType, CapabilityMeta<ActionType>> =
     type: 'GENERATE_SUMMARY',
     label: 'Synthesize AI Summary',
     category: 'AI Analysis',
-    description: 'Uses Gemini to summarize updates, transcripts, or email threads',
+    description: 'Uses AI (Grok / Gemini) to summarize updates, transcripts, or email threads',
   },
   SAVE_DATA: {
     type: 'SAVE_DATA',

@@ -34,7 +34,7 @@ export const CapabilitiesRegistryModal: React.FC = () => {
               AURA Capability Registry
             </h1>
             <p className="text-xs text-slate-500">
-              Controlled registry of verified primitives that Gemini is authorized to orchestrate
+              Controlled registry of verified primitives that Grok is authorized to orchestrate
             </p>
           </div>
         </div>
@@ -44,7 +44,7 @@ export const CapabilitiesRegistryModal: React.FC = () => {
             🛡️ AI Safety Architecture Guardrail:
           </p>
           <p className="text-slate-600">
-            Gemini is constrained to synthesize workflows using strictly registered capabilities. Arbitrary executable code generation and <code className="text-indigo-700 font-bold">eval()</code> are structurally prohibited.
+            Grok is constrained to synthesize workflows using strictly registered capabilities. Arbitrary executable code generation and <code className="text-indigo-700 font-bold">eval()</code> are structurally prohibited.
           </p>
         </div>
       </div>
