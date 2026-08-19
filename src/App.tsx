@@ -641,6 +641,7 @@ export default function App() {
                   onSimulateClick={() => setIsSimulationOpen(true)}
                   onEditClick={() => setIsEditModalOpen(true)}
                   onActivateClick={handleActivateWorkflow}
+                  onRunLive={handleRunWorkflow}
                   isActivated={isCurrentActive}
                 />
               </div>

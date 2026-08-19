@@ -167,6 +167,36 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
     }
   };
 
+  const [sendingTestMail, setSendingTestMail] = useState(false);
+  const [mailSentStatus, setMailSentStatus] = useState<string | null>(null);
+
+  const handleSendTestEmail = async () => {
+    setSendingTestMail(true);
+    setMailSentStatus(null);
+    try {
+      const targetEmail = status.user?.email || firebaseUser?.email || 'mohanmohan200405@gmail.com';
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: targetEmail,
+          subject: '⚡ Test Alert from AURA',
+          body: 'This is a test notification from AURA execution engine confirming live Gmail delivery.',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMailSentStatus(`✓ Dispatched to ${targetEmail} (Message ID: ${data.messageId || 'sent'})`);
+      } else {
+        setMailSentStatus(`Notice: ${data.error || 'Check Google OAuth status'}`);
+      }
+    } catch (e: any) {
+      setMailSentStatus(`Notice: ${e?.message || 'Failed to dispatch'}`);
+    } finally {
+      setSendingTestMail(false);
+    }
+  };
+
   const displayEmail = firebaseUser?.email || status.user?.email || status.demoAccount || 'mohanmohan200405@gmail.com';
 
   return (
@@ -250,16 +280,25 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
                   <Mail className="h-4 w-4 text-rose-500" />
                   <div>
                     <div className="text-xs font-bold text-slate-900">Gmail API</div>
-                    <div className="text-[10px] text-slate-500">Inbox polling & semantic triage</div>
+                    <div className="text-[10px] text-slate-500">Inbox polling & live alerts</div>
                   </div>
                 </div>
-                <button
-                  onClick={handleTestGmail}
-                  disabled={testingGmail}
-                  className="rounded px-2 py-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-                >
-                  {testingGmail ? 'Testing...' : 'Test Gmail'}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleTestGmail}
+                    disabled={testingGmail}
+                    className="rounded px-2 py-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                  >
+                    {testingGmail ? 'Testing...' : 'Poll Inbox'}
+                  </button>
+                  <button
+                    onClick={handleSendTestEmail}
+                    disabled={sendingTestMail}
+                    className="rounded px-2 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors"
+                  >
+                    {sendingTestMail ? 'Sending...' : 'Send Alert'}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between rounded-lg bg-white p-3 border border-slate-200 shadow-2xs">
@@ -279,6 +318,12 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
                 </button>
               </div>
             </div>
+
+            {mailSentStatus && (
+              <div className="mt-2.5 rounded-lg bg-white p-2.5 text-xs font-mono text-slate-700 border border-slate-200 shadow-2xs">
+                {mailSentStatus}
+              </div>
+            )}
           </div>
 
           {/* Firebase Cloud Firestore Card */}

@@ -13,6 +13,7 @@ import { checkApprovalPolicy } from '../policy/approvalEngine.ts';
 import {
   Sparkles,
   Play,
+  Zap,
   Sliders,
   CheckCircle2,
   AlertTriangle,
@@ -29,6 +30,7 @@ interface WorkflowPreviewProps {
   onSimulateClick: () => void;
   onEditClick: () => void;
   onActivateClick: (workflow: Workflow) => void;
+  onRunLive?: (workflow: Workflow) => void;
   isActivated?: boolean;
 }
 
@@ -37,6 +39,7 @@ export const WorkflowPreview: React.FC<WorkflowPreviewProps> = ({
   onSimulateClick,
   onEditClick,
   onActivateClick,
+  onRunLive,
   isActivated = false,
 }) => {
   const [explainTab, setExplainTab] = useState<'plan' | 'graph' | 'explainability'>('plan');
@@ -75,6 +78,17 @@ export const WorkflowPreview: React.FC<WorkflowPreviewProps> = ({
 
           {/* Top Quick Actions */}
           <div className="flex flex-wrap items-center gap-2.5">
+            {onRunLive && (
+              <button
+                onClick={() => onRunLive(workflow)}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs sm:text-sm font-bold text-white hover:bg-emerald-500 transition-colors shadow-sm whitespace-nowrap"
+                title="Execute actions live (send real email, calendar booking, task creation)"
+              >
+                <Zap className="h-4 w-4 fill-current" />
+                <span>Run Live Test</span>
+              </button>
+            )}
+
             <button
               onClick={onSimulateClick}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"

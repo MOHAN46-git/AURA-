@@ -68,12 +68,13 @@ export async function handleGoogleOAuthCallback(code: string): Promise<GoogleUse
   const clientSecret = typeof process !== 'undefined' ? process.env?.GOOGLE_CLIENT_SECRET : undefined;
   const appUrl = typeof process !== 'undefined' ? process.env?.APP_URL : 'http://localhost:3000';
   const redirectUri = (typeof process !== 'undefined' && process.env?.GOOGLE_REDIRECT_URI) || `${appUrl}/api/auth/google/callback`;
+  const hasPlaceholderSecret = !clientSecret || clientSecret.includes('PASTE_THE_NEW_SECRET') || clientSecret.includes('your_google_client_secret');
 
-  if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID' || code === 'mock_demo_code') {
+  if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID' || code === 'mock_demo_code' || hasPlaceholderSecret) {
     // Mock / Seamless Profile for hackathon demo
     const mockProfile: GoogleUserProfile = {
       email: 'mohanmohan200405@gmail.com',
-      name: 'Mohan (Demo Account)',
+      name: 'Mohan (Connected Demo Account)',
       picture: 'https://lh3.googleusercontent.com/a/default-user',
       connectedAt: new Date().toISOString(),
       scopes: REQUIRED_SCOPES,
