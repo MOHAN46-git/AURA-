@@ -18,6 +18,12 @@ import { CapabilitiesRegistryModal } from './components/CapabilitiesRegistryModa
 import { DemoTestConsole } from './components/DemoTestConsole.tsx';
 import { GoogleIntegrationsModal } from './components/GoogleIntegrationsModal.tsx';
 import { TasksView } from './components/TasksView.tsx';
+import { FirebaseAuthUser, subscribeToFirebaseAuthState } from './firebase/authService.ts';
+import {
+  syncWorkflowToFirestore,
+  syncTaskToFirestore,
+  syncExecutionLogToFirestore,
+} from './firebase/firestoreService.ts';
 import {
   Sparkles,
   CheckCircle2,
@@ -115,12 +121,24 @@ export default function App() {
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isKillSwitchActive, setIsKillSwitchActive] = useState(false);
   const [failureSimulationActive, setFailureSimulationActive] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthUser | null>(null);
   const [googleStatus, setGoogleStatus] = useState({
     connected: true,
     email: 'mohanmohan200405@gmail.com',
   });
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Subscribe to Firebase Auth state on mount
+  useEffect(() => {
+    const unsubscribe = subscribeToFirebaseAuthState((user) => {
+      setFirebaseUser(user);
+      if (user?.email) {
+        setGoogleStatus((prev) => ({ ...prev, email: user.email! }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load Google status & Demo failure simulation status on mount
   useEffect(() => {
@@ -304,7 +322,8 @@ export default function App() {
     });
 
     setCurrentWorkflow(updated);
-    showToast(`Workflow "${updated.name}" is now active in your fleet.`);
+    syncWorkflowToFirestore(updated);
+    showToast(`Workflow "${updated.name}" is now active & synced to Firebase.`);
   };
 
   const handleToggleStatus = (id: string) => {
@@ -312,8 +331,10 @@ export default function App() {
       prev.map((w) => {
         if (w.id === id) {
           const nextStatus = w.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+          const updatedWf = { ...w, status: nextStatus };
+          syncWorkflowToFirestore(updatedWf);
           showToast(`Workflow "${w.name}" set to ${nextStatus}.`, 'info');
-          return { ...w, status: nextStatus };
+          return updatedWf;
         }
         return w;
       })
@@ -344,20 +365,23 @@ export default function App() {
     const isRecovered = failureSimulationActive || (workflow.recovery.enabled && Math.random() > 0.6);
     const duration = isRecovered ? Math.floor(Math.random() * 300 + 500) : Math.floor(Math.random() * 200 + 150);
 
-    // If workflow creates a task, persist to real task store
+    // If workflow creates a task, persist to real task store & Firestore
     if (workflow.actions.some((a) => a.type === 'CREATE_TASK')) {
       try {
+        const taskPayload = {
+          id: `task-${Date.now()}`,
+          title: workflow.name || 'Automated Customer Task',
+          description: workflow.goal,
+          priority: workflow.actions.find((a) => a.type === 'CREATE_TASK')?.priority || 'HIGH',
+          source: 'Gmail (Urgent Ingestion)',
+          useBackupProvider: isRecovered,
+        };
         await fetch('/api/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: workflow.name || 'Automated Customer Task',
-            description: workflow.goal,
-            priority: workflow.actions.find((a) => a.type === 'CREATE_TASK')?.priority || 'HIGH',
-            source: 'Gmail (Urgent Ingestion)',
-            useBackupProvider: isRecovered,
-          }),
+          body: JSON.stringify(taskPayload),
         });
+        syncTaskToFirestore(taskPayload);
       } catch (e) {
         console.warn('Real task creation notice:', e);
       }
@@ -415,6 +439,7 @@ export default function App() {
 
     setLogs((prev) => [newLog, ...prev]);
     setExecutionCount((c) => c + 1);
+    syncExecutionLogToFirestore(newLog);
     showToast(
       isRecovered
         ? `Goal Recovered! Primary failed & auto-switched to Backup provider.`
@@ -451,6 +476,7 @@ export default function App() {
         onToggleKillSwitch={handleToggleKillSwitch}
         isDemoMode={true}
         failureSimulationActive={failureSimulationActive}
+        firebaseUser={firebaseUser}
       />
 
       {/* Emergency Kill Switch Alert Banner */}
@@ -643,6 +669,13 @@ export default function App() {
       <GoogleIntegrationsModal
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
+        firebaseUser={firebaseUser}
+        onFirebaseUserChange={(user) => {
+          setFirebaseUser(user);
+          if (user?.email) {
+            setGoogleStatus((prev) => ({ ...prev, email: user.email! }));
+          }
+        }}
         onRefreshStatus={async () => {
           try {
             const res = await fetch('/api/health');

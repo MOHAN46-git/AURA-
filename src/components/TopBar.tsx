@@ -15,7 +15,10 @@ import {
   Zap,
   Power,
   ShieldAlert,
+  Flame,
+  Cloud,
 } from 'lucide-react';
+import { FirebaseAuthUser } from '../firebase/authService.ts';
 
 interface TopBarProps {
   activeTab: 'studio' | 'automations' | 'tasks' | 'logs' | 'capabilities' | 'tests';
@@ -30,6 +33,7 @@ interface TopBarProps {
   onToggleKillSwitch?: () => void;
   isDemoMode?: boolean;
   failureSimulationActive?: boolean;
+  firebaseUser?: FirebaseAuthUser | null;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -45,6 +49,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleKillSwitch,
   isDemoMode = true,
   failureSimulationActive = false,
+  firebaseUser,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#0F172A] text-white shadow-sm">
@@ -65,6 +70,12 @@ export const TopBar: React.FC<TopBarProps> = ({
               </span>
             </div>
           </button>
+
+          {/* Firebase Cloud Sync Badge */}
+          <div className="hidden xl:flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400 border border-amber-500/20">
+            <Flame className="h-3 w-3 text-amber-400" />
+            <span>project1-4506</span>
+          </div>
 
           {isDemoMode && (
             <span className="hidden lg:inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
@@ -166,14 +177,14 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Actions Zone */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Google Integrations Quick Button */}
+          {/* Google & Firebase Integrations Quick Button */}
           <button
             onClick={onOpenGoogleIntegrations}
             className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-all shadow-2xs"
-            title="Google Workspace OAuth Status"
+            title="Google & Firebase Cloud Status"
           >
             <span className={`h-2 w-2 rounded-full ${googleConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            <span className="hidden sm:inline">Google</span>
+            <span className="hidden sm:inline">{firebaseUser?.email ? firebaseUser.email.split('@')[0] : 'Google & Firebase'}</span>
           </button>
 
           {/* Emergency Kill Switch */}

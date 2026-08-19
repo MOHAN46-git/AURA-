@@ -18,8 +18,15 @@ import { testIdempotencyAndKillSwitch } from './integration/idempotencyKillSwitc
 import { testAiProviderDetection } from './unit/aiProvider.test.ts';
 import { testTamilNlpEngine } from './unit/tamilNlp.test.ts';
 import { testGoogleAndTaskIntegration } from './integration/googleIntegration.test.ts';
+import { testFirebaseIntegration } from './unit/firebaseConfig.test.ts';
 
 export const ALL_AURA_TESTS: TestCase[] = [
+  {
+    id: 'test-firebase-integration',
+    name: 'Firebase (Auth & Firestore project1-4506) Cloud Sync',
+    category: 'unit',
+    fn: testFirebaseIntegration,
+  },
   {
     id: 'test-google-task-integration',
     name: 'Google Services (Calendar/Gmail), Task Failover & Outcome Verification',

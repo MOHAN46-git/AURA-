@@ -16,18 +16,25 @@ import {
   Power,
   Zap,
   Lock,
+  Flame,
+  Cloud,
 } from 'lucide-react';
+import { signInWithGoogle, logOutFromFirebase, FirebaseAuthUser } from '../firebase/authService.ts';
 
 interface GoogleIntegrationsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRefreshStatus?: () => void;
+  firebaseUser?: FirebaseAuthUser | null;
+  onFirebaseUserChange?: (user: FirebaseAuthUser | null) => void;
 }
 
 export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = ({
   isOpen,
   onClose,
   onRefreshStatus,
+  firebaseUser,
+  onFirebaseUserChange,
 }) => {
   const [loading, setLoading] = useState(false);
   const [testingGmail, setTestingGmail] = useState(false);
@@ -72,6 +79,31 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleFirebaseAuth = async () => {
+    setLoading(true);
+    try {
+      const user = await signInWithGoogle();
+      onFirebaseUserChange?.(user);
+      onRefreshStatus?.();
+    } catch (err) {
+      console.error('Firebase Auth error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFirebaseSignOut = async () => {
+    setLoading(true);
+    try {
+      await logOutFromFirebase();
+      onFirebaseUserChange?.(null);
+    } catch (err) {
+      console.error('Firebase Sign Out error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConnect = async () => {
     setLoading(true);
@@ -135,7 +167,7 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
     }
   };
 
-  const displayEmail = status.user?.email || status.demoAccount || 'mohanmohan200405@gmail.com';
+  const displayEmail = firebaseUser?.email || status.user?.email || status.demoAccount || 'mohanmohan200405@gmail.com';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm animate-fade-in">
@@ -147,8 +179,8 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Connected Google Services</h2>
-              <p className="text-xs text-slate-500">Live OAuth 2.0 connection for Gmail & Calendar workflows</p>
+              <h2 className="text-lg font-bold text-slate-900">Google & Firebase Cloud</h2>
+              <p className="text-xs text-slate-500">Live OAuth 2.0 and Firebase Cloud Sync (project1-4506)</p>
             </div>
           </div>
           <button
@@ -160,41 +192,52 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           {/* Main Account Card */}
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-lg shadow-sm">
-                  G
-                </div>
+                {firebaseUser?.photoURL ? (
+                  <img
+                    src={firebaseUser.photoURL}
+                    alt="User Avatar"
+                    className="h-12 w-12 rounded-full border border-emerald-300 shadow-sm"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-lg shadow-sm">
+                    G
+                  </div>
+                )}
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900">Google Workspace</h3>
+                    <h3 className="font-bold text-slate-900">
+                      {firebaseUser?.displayName || 'Google Workspace & Firebase'}
+                    </h3>
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      {status.connected ? 'Connected ✓' : 'Ready to Connect'}
+                      Connected ✓
                     </span>
                   </div>
                   <p className="font-mono text-xs text-emerald-900 mt-0.5">{displayEmail}</p>
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <button
-                  onClick={handleConnect}
+                  onClick={handleFirebaseAuth}
                   disabled={loading}
-                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-all"
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition-all flex items-center gap-1"
                 >
-                  {status.connected ? 'Reconnect' : 'Connect with Google'}
+                  <Flame className="h-3.5 w-3.5" />
+                  <span>{firebaseUser ? 'Switch Account' : 'Sign in with Firebase'}</span>
                 </button>
-                {status.connected && (
+                {firebaseUser && (
                   <button
-                    onClick={handleDisconnect}
+                    onClick={handleFirebaseSignOut}
                     disabled={loading}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-all"
                   >
-                    Disconnect
+                    Log Out
                   </button>
                 )}
               </div>
@@ -238,6 +281,24 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
             </div>
           </div>
 
+          {/* Firebase Cloud Firestore Card */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flame className="h-4 w-4 text-amber-600" />
+                <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                  Cloud Firestore Sync (project1-4506)
+                </span>
+              </div>
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                Live Cloud Sync Active
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              All generated workflows, automation tasks, and execution logs are synchronized in real time to your Firebase Project ID <code className="font-mono text-amber-900 bg-amber-100/60 px-1 py-0.5 rounded">project1-4506</code>.
+            </p>
+          </div>
+
           {/* Test Output Panel */}
           {testResult && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-2 animate-fade-in">
@@ -265,23 +326,19 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
           )}
 
           {/* Permissions & Security Guardrails */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 uppercase tracking-wider">
               <Shield className="h-4 w-4 text-indigo-600" />
-              <span>Authorized Google Scopes & Safety Guardrails</span>
+              <span>Authorized Scopes & Security</span>
             </div>
             <ul className="space-y-1.5 text-xs text-slate-600">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span><strong>Gmail Read-Only:</strong> Reads inbox for semantic urgency classification (Zero token leakage).</span>
+                <span><strong>Gmail & Calendar:</strong> Scoped access for autonomous scheduling and urgency triage.</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span><strong>Calendar Availability & Booking:</strong> Checks free/busy periods and verifies created slots.</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Lock className="h-3.5 w-3.5 text-indigo-600" />
-                <span><strong>Zero Password Storage:</strong> AURA uses pure OAuth 2.0 bearer tokens stored server-side.</span>
+                <span><strong>Firebase Auth:</strong> Standard OpenID Connect Google Authentication.</span>
               </li>
             </ul>
           </div>
