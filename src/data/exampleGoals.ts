@@ -57,11 +57,25 @@ export const EXAMPLE_GOALS: ExampleGoal[] = [
     expectedOutcome: 'Enforces human-in-the-loop review policy before outbound SMTP dispatch.',
   },
   {
+    id: 'demo-texting-1',
+    title: 'Texting Command & Instant Task Triage',
+    goal: 'Whenever I receive an urgent text message or SMS, create a high-priority task and text me a confirmation.',
+    tag: 'Texting Command ★',
+    expectedOutcome: 'Ingests text message trigger, parses urgent task, dispatches outbound SMS delivery confirmation.',
+  },
+  {
     id: 'demo-tamil-1',
     title: 'அவசர மின்னஞ்சல் & பணி உருவாக்கம் (Tamil Triage)',
     goal: 'அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது, உயர் முன்னுரிமை பணியை உருவாக்கி எனக்கு உடனடியாக தெரிவிக்கவும்.',
     tag: 'தமிழ் NLP ★',
     expectedOutcome: 'Processes Tamil intent: detects urgent email, creates high-priority task, and sends push notification.',
+  },
+  {
+    id: 'demo-tamil-sms',
+    title: 'குறுஞ்செய்தி கட்டளை (Tamil SMS Command)',
+    goal: 'அவசர குறுஞ்செய்தி வரும்போது, பணியை உருவாக்கி எனக்கு குறுஞ்செய்தி மூலம் உறுதிப்படுத்தவும்.',
+    tag: 'தமிழ் SMS ★',
+    expectedOutcome: 'Processes Tamil SMS intent: detects urgent text, creates task, and dispatches SMS confirmation.',
   },
   {
     id: 'demo-tamil-2',

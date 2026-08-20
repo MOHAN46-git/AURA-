@@ -266,6 +266,101 @@ export const INITIAL_MOCK_AUTOMATIONS: Workflow[] = [
     executionCount: 18,
     lastRunStatus: 'RECOVERED',
   },
+  {
+    id: 'wf-demo-texting-command',
+    name: 'Texting Command & Instant Task Triage',
+    goal: 'Whenever I receive an urgent text message or SMS, create a high-priority task and text me a confirmation.',
+    rawPrompt: 'Whenever I receive an urgent text message or SMS, create a high-priority task and text me a confirmation.',
+    confidence: 0.98,
+    confidenceLevel: 'HIGH',
+    trigger: {
+      type: 'TEXT_RECEIVED',
+      description: 'When an incoming text / SMS command is received',
+    },
+    conditions: [
+      {
+        type: 'SEMANTIC_MATCH',
+        value: 'urgent request or command',
+        description: 'Determine whether the text message represents an urgent request or command',
+      },
+    ],
+    actions: [
+      {
+        id: 'action-task-1',
+        type: 'CREATE_TASK',
+        description: 'Create high-priority task in primary task provider',
+        priority: 'HIGH',
+      },
+      {
+        id: 'action-text-2',
+        type: 'SEND_TEXT',
+        description: 'Dispatch outbound SMS text message confirmation',
+        priority: 'HIGH',
+      },
+    ],
+    risk: {
+      level: 'HIGH',
+      reason: 'Dispatches outbound SMS / text communication; review confirmation before dispatching.',
+      factors: ['Dispatches outbound SMS or text message to recipient', 'Creates a persistent task in task provider'],
+    },
+    approvalRequired: true,
+    recovery: {
+      enabled: true,
+      strategy: 'RETRY_THEN_FALLBACK',
+      retryCount: 2,
+      fallback: 'BACKUP_TASK_PROVIDER',
+      description: 'Retry twice → Backup task provider',
+    },
+    verification: {
+      type: 'TEXT_SENT',
+      description: 'Confirm text / SMS delivery receipt',
+    },
+    explainability: {
+      understoodIntent: 'Handle urgent text commands and dispatch SMS confirmation receipts with failover.',
+      planSteps: [
+        'Monitor incoming SMS and text commands.',
+        'Evaluate urgency semantic matching criteria.',
+        'Create high-priority task in task system.',
+        'Dispatch outbound text confirmation to sender.',
+        'Verify SMS carrier receipt delivery acknowledgment.',
+        'Failover to backup task provider if primary task service is degraded.',
+      ],
+      actionJustification: 'Allows seamless hands-free mobile command execution with instant SMS receipts.',
+      failureModes: ['Carrier SMS gateway timeout', 'Task provider rate limiting'],
+      recoveryExplanation: 'AURA retries 2 times and switches to backup task provider.',
+      verificationExplanation: 'Queries SMS carrier gateway receipt for delivery certification.',
+    },
+    requiredCapabilities: [
+      {
+        id: 'sms:read',
+        category: 'Messaging',
+        permission: 'sms:read',
+        label: 'Text / SMS: Read',
+        description: 'Allows reading incoming SMS and text command messages',
+        granted: true,
+      },
+      {
+        id: 'tasks:create',
+        category: 'Tasks',
+        permission: 'tasks:create',
+        label: 'Tasks: Create',
+        description: 'Creates items in primary and backup task services',
+        granted: true,
+      },
+      {
+        id: 'sms:send',
+        category: 'Messaging',
+        permission: 'sms:send',
+        label: 'Text / SMS: Send',
+        description: 'Allows dispatching outbound SMS and text messages',
+        granted: true,
+      },
+    ],
+    createdAt: '2026-08-18T09:00:00Z',
+    status: 'ACTIVE',
+    executionCount: 24,
+    lastRunStatus: 'SUCCESS',
+  },
 ];
 
 export interface DashboardMetrics {

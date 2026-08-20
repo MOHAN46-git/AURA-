@@ -35,6 +35,12 @@ export function evaluateDeterministicRisk(workflow: Partial<Workflow>): {
         approvalRequired = true;
         break;
 
+      case 'SEND_TEXT':
+        calculatedLevel = maxRisk(calculatedLevel, 'HIGH');
+        factors.push('Dispatches outbound SMS or text message to recipient');
+        approvalRequired = true;
+        break;
+
       case 'CALL_WEBHOOK':
         calculatedLevel = maxRisk(calculatedLevel, 'HIGH');
         factors.push('Executes external HTTP webhook integration with third-party endpoints');

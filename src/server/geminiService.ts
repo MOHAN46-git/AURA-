@@ -342,13 +342,22 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
 
   // Primary demo prompts & keyword matching (English & Tamil / தமிழ்)
   const isEmail =
-    p.includes('email') ||
+    (p.includes('email') ||
     p.includes('inbox') ||
-    p.includes('message') ||
     p.includes('மின்னஞ்சல்') ||
-    p.includes('செய்தி') ||
     p.includes('மடல்') ||
-    p.includes('மெயில்');
+    p.includes('மெயில்')) && !p.includes('text') && !p.includes('sms') && !p.includes('குறுஞ்செய்தி');
+
+  const isText =
+    p.includes('text') ||
+    p.includes('sms') ||
+    p.includes('texting') ||
+    p.includes('text message') ||
+    p.includes('text command') ||
+    p.includes('குறுஞ்செய்தி') ||
+    p.includes('எஸ்எம்எஸ்') ||
+    p.includes('kurunseithi') ||
+    p.includes('sms anuppu');
 
   const isUrgent =
     p.includes('urgent') ||
@@ -429,6 +438,22 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
     p.includes('மெயில் அனுப்பு') ||
     p.includes('email anuppu');
 
+  const isSendText =
+    p.includes('send text') ||
+    p.includes('send sms') ||
+    p.includes('text me') ||
+    p.includes('reply with text') ||
+    p.includes('reply via text') ||
+    p.includes('text back') ||
+    p.includes('text a confirmation') ||
+    p.includes('குறுஞ்செய்தி அனுப்பு') ||
+    p.includes('குறுஞ்செய்தி மூலம்') ||
+    p.includes('எஸ்எம்எஸ் அனுப்பு') ||
+    p.includes('எஸ்எம்எஸ் மூலம்') ||
+    (p.includes('குறுஞ்செய்தி') && (p.includes('உறுதி') || p.includes('தெரிவி') || p.includes('அனுப்பு') || p.includes('பதில்'))) ||
+    (p.includes('எஸ்எம்எஸ்') && (p.includes('உறுதி') || p.includes('தெரிவி') || p.includes('அனுப்பு') || p.includes('பதில்'))) ||
+    p.includes('sms anuppu');
+
   const isWebhook = p.includes('webhook') || p.includes('api call') || p.includes('வலைக்கொக்கி');
 
   // Trigger
@@ -451,6 +476,9 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
   ) {
     triggerType = 'SCHEDULE';
     triggerDesc = (p.includes('monday') || p.includes('திங்கள்')) ? 'Every Monday at 09:00 AM' : 'Scheduled recurring timer';
+  } else if (isText || p.includes('text message') || p.includes('sms') || p.includes('குறுஞ்செய்தி') || p.includes('எஸ்எம்எஸ்')) {
+    triggerType = 'TEXT_RECEIVED';
+    triggerDesc = 'When an incoming text / SMS command is received';
   } else if (p.includes('calendar') || p.includes('நாள்காட்டி') || p.includes('கூட்டம்') && (p.includes('before') || p.includes('after') || p.includes('event created'))) {
     triggerType = 'CALENDAR_EVENT';
     triggerDesc = 'When a calendar event is scheduled or updated';
@@ -461,11 +489,13 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
 
   // Conditions
   const conditions = [];
-  if (isEmail && isUrgent) {
+  if ((isEmail || isText) && isUrgent) {
     conditions.push({
       type: 'SEMANTIC_MATCH' as const,
       value: 'urgent customer request',
-      description: 'Determine whether the email represents an urgent customer request',
+      description: isText
+        ? 'Determine whether the text message represents an urgent request or command'
+        : 'Determine whether the email represents an urgent customer request',
     });
   } else if (p.includes('customer') || p.includes('வாடிக்கையாளர்')) {
     conditions.push({
@@ -490,7 +520,7 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
       priority: 'MEDIUM' as const,
     });
   }
-  if (isTask || (!isSummary && !isCalendar && !isSendEmail)) {
+  if (isTask || (!isSummary && !isCalendar && !isSendEmail && !isSendText)) {
     actions.push({
       id: 'action-1',
       type: 'CREATE_TASK' as const,
@@ -504,6 +534,14 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
       type: 'CREATE_CALENDAR_EVENT' as const,
       description: 'Schedule meeting during open afternoon window',
       priority: 'MEDIUM' as const,
+    });
+  }
+  if (isSendText) {
+    actions.push({
+      id: 'action-text',
+      type: 'SEND_TEXT' as const,
+      description: 'Dispatch outbound SMS or text message confirmation',
+      priority: isUrgent ? ('HIGH' as const) : ('MEDIUM' as const),
     });
   }
   if (isNotify || actions.length === 1) {
@@ -547,17 +585,25 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
   const verification = {
     type: actions.some((a) => a.type === 'CREATE_TASK')
       ? ('TASK_EXISTS' as const)
+      : actions.some((a) => a.type === 'SEND_TEXT')
+      ? ('TEXT_SENT' as const)
       : actions.some((a) => a.type === 'SEND_EMAIL')
       ? ('EMAIL_SENT' as const)
       : ('DATA_SAVED' as const),
     description: actions.some((a) => a.type === 'CREATE_TASK')
       ? 'Confirm that the requested task exists'
+      : actions.some((a) => a.type === 'SEND_TEXT')
+      ? 'Confirm text / SMS delivery receipt'
       : 'Confirm operation execution receipt',
   };
 
   const confidence = prompt.length > 10 ? 0.96 : 0.75;
   const rawObj = {
-    name: isUrgent && isEmail ? 'Urgent Customer Email Handler' : (isSummary ? 'Weekly Project Summary' : 'Intelligent Automation Plan'),
+    name: isText
+      ? (isUrgent ? 'Urgent Text / SMS Command Handler' : 'Texting Command Automation')
+      : isUrgent && isEmail
+      ? 'Urgent Customer Email Handler'
+      : (isSummary ? 'Weekly Project Summary' : 'Intelligent Automation Plan'),
     goal: prompt,
     confidence,
     trigger: {
@@ -569,7 +615,7 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
     recovery,
     verification,
     explainability: {
-      understoodIntent: `Handle ${isUrgent ? 'urgent customer requests' : 'automated operations'} reliably and automatically.`,
+      understoodIntent: `Handle ${isText ? 'text commands and SMS events' : isUrgent ? 'urgent customer requests' : 'automated operations'} reliably and automatically.`,
       planSteps: [
         `Monitor ${triggerDesc.toLowerCase()}.`,
         ...(conditions.map((c) => `Verify that ${c.description.toLowerCase()}.`)),
@@ -579,7 +625,7 @@ function generateDeterministicWorkflow(prompt: string): Workflow {
       ],
       actionJustification: 'Configured actions ensure critical items are immediately captured, assigned, and visible.',
       failureModes: [
-        'Primary task service rate limits or temporary downtime (503 HTTP errors)',
+        'Primary service rate limits or temporary downtime (503 HTTP errors)',
         'Network gateway latency exceeding standard timeout windows',
       ],
       recoveryExplanation: recovery.enabled

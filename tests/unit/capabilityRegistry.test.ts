@@ -18,6 +18,7 @@ import { GOLDEN_HACKATHON_WORKFLOW } from '../fixtures/workflows.ts';
 export async function testCapabilityRegistry(): Promise<void> {
   // 1. Check supported triggers
   assert(Boolean(SUPPORTED_TRIGGERS.EMAIL_RECEIVED), 'EMAIL_RECEIVED must be supported');
+  assert(Boolean(SUPPORTED_TRIGGERS.TEXT_RECEIVED), 'TEXT_RECEIVED must be supported');
   assert(Boolean(SUPPORTED_TRIGGERS.SCHEDULE), 'SCHEDULE must be supported');
   assert(Boolean(SUPPORTED_TRIGGERS.CALENDAR_EVENT), 'CALENDAR_EVENT must be supported');
   assert(Boolean(SUPPORTED_TRIGGERS.MANUAL), 'MANUAL must be supported');
@@ -26,8 +27,10 @@ export async function testCapabilityRegistry(): Promise<void> {
   assert(Boolean(SUPPORTED_ACTIONS.CREATE_TASK), 'CREATE_TASK must be supported');
   assert(Boolean(SUPPORTED_ACTIONS.SEND_NOTIFICATION), 'SEND_NOTIFICATION must be supported');
   assert(Boolean(SUPPORTED_ACTIONS.SEND_EMAIL), 'SEND_EMAIL must be supported');
+  assert(Boolean(SUPPORTED_ACTIONS.SEND_TEXT), 'SEND_TEXT must be supported');
   assert(Boolean(SUPPORTED_ACTIONS.GENERATE_SUMMARY), 'GENERATE_SUMMARY must be supported');
   assert(Boolean(SUPPORTED_ACTIONS.CALL_WEBHOOK), 'CALL_WEBHOOK must be supported');
+  assert(Boolean(SUPPORTED_VERIFICATION_TYPES.TEXT_SENT), 'TEXT_SENT must be supported');
 
   // 3. Verify unsupported capabilities are correctly flagged
   assertFalse(isCapabilitySupported('ACTIONS', 'TRANSFER_MONEY'), 'TRANSFER_MONEY must not be supported');

@@ -16,13 +16,19 @@ import {
 import { db } from './config.ts';
 import { Workflow } from '../workflow/types.ts';
 
+function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return null as unknown as T;
+  return JSON.parse(JSON.stringify(data, (_, value) => (value === undefined ? null : value)));
+}
+
 export async function syncWorkflowToFirestore(workflow: Workflow): Promise<boolean> {
   try {
     const docRef = doc(db, 'workflows', workflow.id);
-    await setDoc(docRef, {
+    const sanitized = sanitizeForFirestore({
       ...workflow,
       syncedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(docRef, sanitized, { merge: true });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to sync workflow to cloud:', err);
@@ -58,10 +64,11 @@ export async function deleteWorkflowFromFirestore(workflowId: string): Promise<b
 export async function syncTaskToFirestore(task: any): Promise<boolean> {
   try {
     const docRef = doc(db, 'tasks', task.id);
-    await setDoc(docRef, {
+    const sanitized = sanitizeForFirestore({
       ...task,
       syncedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(docRef, sanitized, { merge: true });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to sync task to cloud:', err);
@@ -72,10 +79,12 @@ export async function syncTaskToFirestore(task: any): Promise<boolean> {
 export async function syncExecutionLogToFirestore(log: any): Promise<boolean> {
   try {
     const docRef = doc(db, 'execution_logs', log.id);
-    await setDoc(docRef, {
+    const sanitized = sanitizeForFirestore({
       ...log,
+      recoveryNote: log.recoveryNote || null,
       syncedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(docRef, sanitized, { merge: true });
     return true;
   } catch (err) {
     console.warn('[Firestore] Failed to sync execution log to cloud:', err);

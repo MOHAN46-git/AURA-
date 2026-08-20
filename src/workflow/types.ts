@@ -5,6 +5,7 @@
 
 export type TriggerType =
   | 'EMAIL_RECEIVED'
+  | 'TEXT_RECEIVED'
   | 'SCHEDULE'
   | 'MANUAL'
   | 'CALENDAR_EVENT'
@@ -23,6 +24,7 @@ export type ActionType =
   | 'CREATE_TASK'
   | 'SEND_NOTIFICATION'
   | 'SEND_EMAIL'
+  | 'SEND_TEXT'
   | 'CREATE_CALENDAR_EVENT'
   | 'GENERATE_SUMMARY'
   | 'SAVE_DATA'
@@ -38,6 +40,7 @@ export type RecoveryStrategyType =
 export type VerificationType =
   | 'TASK_EXISTS'
   | 'EMAIL_SENT'
+  | 'TEXT_SENT'
   | 'EVENT_EXISTS'
   | 'DATA_SAVED'
   | 'WEBHOOK_SUCCESS'

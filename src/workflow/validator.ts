@@ -323,6 +323,12 @@ function determineDefaultVerification(actions: ActionDefinition[]): Verification
       description: 'Confirm that outgoing email was successfully dispatched',
     };
   }
+  if (actions.some((a) => a.type === 'SEND_TEXT')) {
+    return {
+      type: 'TEXT_SENT',
+      description: 'Confirm that outgoing text / SMS message was successfully delivered',
+    };
+  }
   if (actions.some((a) => a.type === 'CREATE_CALENDAR_EVENT')) {
     return {
       type: 'EVENT_EXISTS',

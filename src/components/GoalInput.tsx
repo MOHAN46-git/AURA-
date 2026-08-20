@@ -45,6 +45,16 @@ const VOICE_PRESETS = [
       'When a VIP client requests a meeting via email, check my Google Calendar for open 45-minute afternoon windows and draft a confirmation invite.',
   },
   {
+    label: 'Texting Command & SMS Task Failover',
+    speech:
+      'Whenever I receive an urgent text message or SMS, create a high-priority task, text me a confirmation, and failover to my backup task provider if needed.',
+  },
+  {
+    label: 'தமிழ் குறுஞ்செய்தி கட்டளை (Tamil SMS)',
+    speech:
+      'அவசர குறுஞ்செய்தி வரும்போது, பணியை உருவாக்கி எனக்கு குறுஞ்செய்தி மூலம் உறுதிப்படுத்தவும்.',
+  },
+  {
     label: 'தமிழ் அவசர மின்னஞ்சல் (Tamil Voice)',
     speech:
       'அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது, உயர் முன்னுரிமை பணியை உருவாக்கி எனக்கு உடனடியாக தெரிவிக்கவும்.',

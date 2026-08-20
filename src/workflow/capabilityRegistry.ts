@@ -39,6 +39,18 @@ export const SUPPORTED_TRIGGERS: Record<TriggerType, CapabilityMeta<TriggerType>
       description: 'Allows reading metadata and contents of incoming emails',
     },
   },
+  TEXT_RECEIVED: {
+    type: 'TEXT_RECEIVED',
+    label: 'Incoming Text / SMS Command',
+    category: 'Messaging',
+    description: 'Triggers when an SMS, text message, or instant command arrives from user or client',
+    requiredPermission: {
+      category: 'Messaging',
+      permission: 'sms:read',
+      label: 'Text / SMS: Read',
+      description: 'Allows reading incoming SMS and text command messages',
+    },
+  },
   SCHEDULE: {
     type: 'SCHEDULE',
     label: 'Time-based Schedule (Cron)',
@@ -159,6 +171,18 @@ export const SUPPORTED_ACTIONS: Record<ActionType, CapabilityMeta<ActionType>> =
       description: 'Allows sending emails to external parties',
     },
   },
+  SEND_TEXT: {
+    type: 'SEND_TEXT',
+    label: 'Send Outbound Text / SMS',
+    category: 'Messaging',
+    description: 'Dispatches an outbound SMS or instant text message to recipient or phone number',
+    requiredPermission: {
+      category: 'Messaging',
+      permission: 'sms:send',
+      label: 'Text / SMS: Send',
+      description: 'Allows dispatching outbound SMS and text messages',
+    },
+  },
   CREATE_CALENDAR_EVENT: {
     type: 'CREATE_CALENDAR_EVENT',
     label: 'Schedule Calendar Event',
@@ -234,6 +258,10 @@ export const SUPPORTED_VERIFICATION_TYPES: Record<VerificationType, { label: str
   EMAIL_SENT: {
     label: 'Email Delivery Receipt',
     description: 'Confirms SMTP / API server accepted the outgoing message transmission.',
+  },
+  TEXT_SENT: {
+    label: 'Text / SMS Delivery Confirmation',
+    description: 'Confirms SMS gateway dispatched the message and received carrier delivery receipt.',
   },
   EVENT_EXISTS: {
     label: 'Calendar Event Confirmation',

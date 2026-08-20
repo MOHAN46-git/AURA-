@@ -13,6 +13,8 @@ import {
   ArrowDown,
   Sparkles,
   Mail,
+  MessageSquare,
+  Smartphone,
   Clock,
   User,
   Calendar,
@@ -41,6 +43,8 @@ export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({ wo
     switch (type) {
       case 'EMAIL_RECEIVED':
         return <Mail className="h-4 w-4 text-indigo-600" />;
+      case 'TEXT_RECEIVED':
+        return <MessageSquare className="h-4 w-4 text-emerald-600" />;
       case 'SCHEDULE':
         return <Clock className="h-4 w-4 text-indigo-600" />;
       case 'CALENDAR_EVENT':
@@ -61,6 +65,8 @@ export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({ wo
         return <Bell className="h-4 w-4 text-indigo-600" />;
       case 'SEND_EMAIL':
         return <Mail className="h-4 w-4 text-sky-600" />;
+      case 'SEND_TEXT':
+        return <MessageSquare className="h-4 w-4 text-emerald-600" />;
       case 'CREATE_CALENDAR_EVENT':
         return <Calendar className="h-4 w-4 text-purple-600" />;
       case 'SAVE_DATA':

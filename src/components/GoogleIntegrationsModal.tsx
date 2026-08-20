@@ -53,6 +53,9 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
     demoAccount: 'mohanmohan200405@gmail.com',
   });
 
+  const [sendingTestMail, setSendingTestMail] = useState(false);
+  const [mailSentStatus, setMailSentStatus] = useState<string | null>(null);
+
   const fetchStatus = async () => {
     try {
       const res = await fetch('/api/auth/google/status');
@@ -166,9 +169,6 @@ export const GoogleIntegrationsModal: React.FC<GoogleIntegrationsModalProps> = (
       setTestingCalendar(false);
     }
   };
-
-  const [sendingTestMail, setSendingTestMail] = useState(false);
-  const [mailSentStatus, setMailSentStatus] = useState<string | null>(null);
 
   const handleSendTestEmail = async () => {
     setSendingTestMail(true);

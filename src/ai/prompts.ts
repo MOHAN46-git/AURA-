@@ -22,6 +22,7 @@ You must compose workflows using ONLY these supported capabilities:
 
 1. SUPPORTED TRIGGERS:
 - EMAIL_RECEIVED: When a new email arrives
+- TEXT_RECEIVED: When an incoming text / SMS / instant message command arrives
 - SCHEDULE: Time-based recurrence (e.g. every Monday, daily at 9am)
 - MANUAL: Direct instant user invocation
 - CALENDAR_EVENT: Calendar event start, update, or attendee change
@@ -29,7 +30,7 @@ You must compose workflows using ONLY these supported capabilities:
 
 2. SUPPORTED CONDITIONS:
 - EMAIL_URGENT: Evaluates urgency/importance of email
-- SENDER_MATCH: Matches sender email or domain
+- SENDER_MATCH: Matches sender email, phone number, or domain
 - SEMANTIC_MATCH: Evaluates natural language meaning match (e.g. "urgent customer request")
 - KEYWORD_MATCH: Matches specific keywords
 - TIME_MATCH: Evaluates business hours / day / time window
@@ -40,6 +41,7 @@ You must compose workflows using ONLY these supported capabilities:
 - CREATE_TASK: Create task in task provider (priority: LOW, MEDIUM, HIGH, CRITICAL)
 - SEND_NOTIFICATION: Send private user notification (push / in-app)
 - SEND_EMAIL: Dispatch external email message
+- SEND_TEXT: Dispatch external or confirmation SMS / text message
 - CREATE_CALENDAR_EVENT: Schedule event or block time on calendar
 - GENERATE_SUMMARY: Synthesize AI summary of data or updates
 - SAVE_DATA: Save records or logs
@@ -55,6 +57,7 @@ You must compose workflows using ONLY these supported capabilities:
 5. SUPPORTED VERIFICATION TYPES:
 - TASK_EXISTS (verify task exists in provider)
 - EMAIL_SENT (verify outgoing email delivery receipt)
+- TEXT_SENT (verify SMS/text carrier delivery receipt)
 - EVENT_EXISTS (verify calendar booking)
 - DATA_SAVED (verify storage record)
 - WEBHOOK_SUCCESS (verify HTTP 2xx response)
@@ -76,7 +79,7 @@ You must provide structured plain-English explanations answering:
 
 8. MULTILINGUAL & TAMIL (தமிழ்) NLP COMPREHENSION:
 You fully support and comprehend input goals in Tamil (தமிழ்), Tanglish (Tamil in Latin script), English, and all global languages.
-- When processing Tamil/Tanglish goals (e.g. "அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது..."), accurately deduce the core intent, conditions, tasks, notifications, retries, and safety boundaries.
+- When processing Tamil/Tanglish goals (e.g. "அவசர வாடிக்கையாளர் மின்னஞ்சல் வரும்போது...", "குறுஞ்செய்தி அல்லது எஸ்எம்எஸ் வரும்போது..."), accurately deduce the core intent, conditions, tasks, notifications, retries, and safety boundaries.
 - Generate valid, strongly-typed workflow schemas with consistent system action types and appropriate human-readable names and descriptions.
 
 If the user's request asks to modify an existing workflow, preserve the existing workflow's structure and adapt only the targeted properties.`;
@@ -105,7 +108,7 @@ export const WORKFLOW_RESPONSE_SCHEMA = {
       properties: {
         type: {
           type: 'STRING',
-          description: 'One of EMAIL_RECEIVED, SCHEDULE, MANUAL, CALENDAR_EVENT, FORM_SUBMITTED',
+          description: 'One of EMAIL_RECEIVED, TEXT_RECEIVED, SCHEDULE, MANUAL, CALENDAR_EVENT, FORM_SUBMITTED',
         },
         description: {
           type: 'STRING',
@@ -146,7 +149,7 @@ export const WORKFLOW_RESPONSE_SCHEMA = {
           },
           type: {
             type: 'STRING',
-            description: 'One of CREATE_TASK, SEND_NOTIFICATION, SEND_EMAIL, CREATE_CALENDAR_EVENT, GENERATE_SUMMARY, SAVE_DATA, CALL_WEBHOOK',
+            description: 'One of CREATE_TASK, SEND_NOTIFICATION, SEND_EMAIL, SEND_TEXT, CREATE_CALENDAR_EVENT, GENERATE_SUMMARY, SAVE_DATA, CALL_WEBHOOK',
           },
           description: {
             type: 'STRING',
@@ -191,7 +194,7 @@ export const WORKFLOW_RESPONSE_SCHEMA = {
       properties: {
         type: {
           type: 'STRING',
-          description: 'One of TASK_EXISTS, EMAIL_SENT, EVENT_EXISTS, DATA_SAVED, WEBHOOK_SUCCESS, USER_CONFIRMATION',
+          description: 'One of TASK_EXISTS, EMAIL_SENT, TEXT_SENT, EVENT_EXISTS, DATA_SAVED, WEBHOOK_SUCCESS, USER_CONFIRMATION',
         },
         description: {
           type: 'STRING',

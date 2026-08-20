@@ -227,6 +227,55 @@ export async function handleApiRequest(req: any, res: any, urlPath: string) {
     }
 
     // -------------------------------------------------------------
+    // SMS / Text Messaging API Endpoints
+    // -------------------------------------------------------------
+    if (urlPath === '/api/sms/send' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { to, message } = body || {};
+
+      if (!message) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ success: false, error: 'message text is required.' }));
+        return;
+      }
+
+      const messageId = `sms_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const timestamp = new Date().toISOString();
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          success: true,
+          messageId,
+          to: to || '+1-555-019-2834',
+          message,
+          timestamp,
+          status: 'DELIVERED',
+          carrierReceipt: `CARRIER_ACK_${Date.now()}`,
+          verified: true,
+        })
+      );
+      return;
+    }
+
+    if (urlPath === '/api/sms/inject-demo-text' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { from = '+1-555-014-9922', text = 'URGENT #task: Fix payment gateway webhook timeout' } = body || {};
+
+      const textEvent = {
+        id: `txt_${Date.now().toString(36)}`,
+        from,
+        text,
+        receivedAt: new Date().toISOString(),
+        isUrgent: text.toLowerCase().includes('urgent') || text.toLowerCase().includes('emergency') || text.toLowerCase().includes('அவசர'),
+      };
+
+      res.statusCode = 200;
+      res.end(JSON.stringify({ success: true, textEvent }));
+      return;
+    }
+
+    // -------------------------------------------------------------
     // Task Store & Failover Endpoints
     // -------------------------------------------------------------
     if (urlPath === '/api/tasks' && req.method === 'GET') {
